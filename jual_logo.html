@@ -33,9 +33,12 @@
   .receipt-row .v { font-weight:700; text-align:right; }
   .receipt-row .v.total { color:var(--green); font-size:16px; }
   .new-btn { width:100%; padding:14px; border-radius:12px; border:1.5px solid var(--border); background:transparent; color:var(--text); font-size:15px; font-weight:700; margin-top:16px; }
+
+  .refresh-corner { position: fixed; top: 12px; right: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 6px 12px; font-size: 12px; color: var(--hint); cursor: pointer; z-index: 100; }
 </style>
 </head>
 <body>
+<div class="refresh-corner" onclick="location.reload()">↻ Refresh</div>
 <div id="app"><div class="loading"><div class="spinner"></div> Memuat...</div></div>
 <script>
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby2wyVacT1kFqYt5481dypHMCp5T_Eg_KertLLWXNE0yu3YqKg4RiDNiqKWPlwGvhCxqw/exec';
