@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Dashboard DIL</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #0f1115);
+    --bg-secondary: var(--tg-theme-secondary-bg-color, #181a20);
+    --text: var(--tg-theme-text-color, #f1f1f1);
+    --hint: var(--tg-theme-hint-color, #8a8f98);
+    --link: var(--tg-theme-link-color, #5eb5f7);
+    --button: var(--tg-theme-button-color, #2ea6ff);
+    --button-text: var(--tg-theme-button-text-color, #ffffff);
+    --card: var(--tg-theme-secondary-bg-color, #1c1f26);
+    --border: rgba(255,255,255,0.08);
+    --green: #34c759;
+    --red: #ff5b5b;
+    --amber: #ffb020;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 15px; line-height: 1.4;
+    padding-bottom: 24px;
+  }
+  header {
+    position: sticky; top: 0; z-index: 20;
+    background: var(--bg);
+    padding: 16px 16px 8px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 {
+    margin: 0 0 2px 0; font-size: 20px; font-weight: 700;
+  }
+  header .sub { color: var(--hint); font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
+  .refresh-btn {
+    background: none; border: none; color: var(--link); font-size: 13px; cursor: pointer;
+    padding: 0; display: flex; align-items: center; gap: 4px;
+  }
+  .period-row {
+    display: flex; gap: 6px; margin-top: 10px; overflow-x: auto; padding-bottom: 4px;
+  }
+  .period-chip {
+    flex-shrink: 0; padding: 6px 14px; border-radius: 20px;
+    background: var(--card); color: var(--hint); font-size: 12.5px; font-weight: 600;
+    border: 1px solid var(--border); cursor: pointer; white-space: nowrap;
+  }
+  .period-chip.active { background: var(--button); color: var(--button-text); border-color: var(--button); }
+
+  .tabs {
+    display: flex; gap: 4px; padding: 10px 12px 0 12px;
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex-shrink: 0; padding: 8px 14px; border-radius: 10px;
+    color: var(--hint); font-size: 13px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .tab.active { background: var(--card); color: var(--text); }
+  .tab .count {
+    background: rgba(255,255,255,0.12); color: inherit;
+    font-size: 10.5px; padding: 1px 6px; border-radius: 8px; font-weight: 700;
+  }
+  .tab.active .count { background: var(--button); color: var(--button-text); }
+
+  main { padding: 14px; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .summary-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px;
+  }
+  .summary-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px;
+  }
+  .summary-card .label { font-size: 11.5px; color: var(--hint); font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+  .summary-card .value { font-size: 19px; font-weight: 800; margin-top: 4px; }
+  .summary-card .count { font-size: 11.5px; color: var(--hint); margin-top: 2px; }
+  .summary-card.red .value { color: var(--red); }
+  .summary-card.green .value { color: var(--green); }
+
+  .mini-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px;
+  }
+  .mini-stat {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 6px; text-align: center;
+  }
+  .mini-stat .n { font-size: 17px; font-weight: 800; }
+  .mini-stat .l { font-size: 10px; color: var(--hint); margin-top: 2px; font-weight: 600; }
+
+  .section-title {
+    font-size: 12.5px; font-weight: 700; color: var(--hint);
+    text-transform: uppercase; letter-spacing: 0.4px;
+    margin: 20px 0 8px 2px;
+  }
+
+  .card-list { display: flex; flex-direction: column; gap: 8px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px;
+  }
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .card-title { font-weight: 700; font-size: 14px; }
+  .card-sub { color: var(--hint); font-size: 12px; margin-top: 2px; }
+  .card-amount { font-weight: 800; font-size: 14.5px; white-space: nowrap; }
+  .card-amount.red { color: var(--red); }
+  .card-amount.green { color: var(--green); }
+  .card-meta {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px;
+  }
+  .badge {
+    font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 7px;
+  }
+  .badge.gray { background: rgba(255,255,255,0.08); color: var(--hint); }
+  .badge.green { background: rgba(52,199,89,0.15); color: var(--green); }
+  .badge.red { background: rgba(255,91,91,0.15); color: var(--red); }
+  .badge.amber { background: rgba(255,176,32,0.15); color: var(--amber); }
+
+  .empty-state {
+    text-align: center; padding: 48px 20px; color: var(--hint);
+  }
+  .empty-state .icon { font-size: 36px; margin-bottom: 10px; opacity: 0.6; }
+  .empty-state .txt { font-size: 13.5px; }
+
+  .loading {
+    display: flex; align-items: center; justify-content: center;
+    padding: 60px 0; color: var(--hint); font-size: 13.5px; gap: 10px;
+  }
+  .spinner {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2.5px solid rgba(255,255,255,0.15); border-top-color: var(--button);
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .updated-note { text-align: center; color: var(--hint); font-size: 11px; margin-top: 18px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📊 Dashboard DIL</h1>
+  <div class="sub">
+    <span id="updatedText">Memuat data...</span>
+    <button class="refresh-btn" onclick="muatData()">↻ Refresh</button>
+  </div>
+  <div class="period-row" id="periodRow">
+    <div class="period-chip" data-hari="7">7 Hari</div>
+    <div class="period-chip active" data-hari="30">30 Hari</div>
+    <div class="period-chip" data-hari="90">90 Hari</div>
+    <div class="period-chip" data-hari="0">Semua</div>
+  </div>
+</header>
+
+<div class="tabs" id="tabsRow">
+  <div class="tab active" data-tab="ringkasan">Ringkasan</div>
+  <div class="tab" data-tab="belumlunas">Belum Lunas <span class="count" id="cBelumLunas">0</span></div>
+  <div class="tab" data-tab="kawat">Kawat <span class="count" id="cKawat">0</span></div>
+  <div class="tab" data-tab="beban">Beban <span class="count" id="cBeban">0</span></div>
+  <div class="tab" data-tab="bayarsupplier">Bayar Supplier <span class="count" id="cBayar">0</span></div>
+  <div class="tab" data-tab="terimadkms">Terima DKMS <span class="count" id="cTerima">0</span></div>
+</div>
+
+<main id="mainContent">
+  <div class="loading"><div class="spinner"></div> Memuat data...</div>
+</main>
+
+<script>
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby2wyVacT1kFqYt5481dypHMCp5T_Eg_KertLLWXNE0yu3YqKg4RiDNiqKWPlwGvhCxqw/exec';
+
+  const tg = window.Telegram ? window.Telegram.WebApp : null;
+  if (tg) { tg.ready(); tg.expand(); }
+
+  // chatId disuntik LANGSUNG dari server (Apps Script) waktu HTML ini
+  // dirender, BUKAN diambil dari Telegram WebApp bridge -- soalnya Apps
+  // Script selalu redirect ke domain googleusercontent.com yang bikin
+  // Telegram enggak ngasih data initData yang valid.
+  const chatId = '<?= chatIdDariServer ?>' || null;
+
+  let hariAktif = 30;
+  let tabAktif = 'ringkasan';
+  let dataTerakhir = null;
+
+  function fRp(n) {
+    n = Math.round(Number(n) || 0);
+    return 'Rp' + n.toLocaleString('id-ID');
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '-' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function tampilAksesDitolak(pesan) {
+    document.querySelector('header').style.display = 'none';
+    document.getElementById('tabsRow').style.display = 'none';
+    document.getElementById('mainContent').innerHTML =
+      '<div class="empty-state" style="padding-top:80px">' +
+      '<div class="icon">🔒</div>' +
+      '<div class="txt" style="font-size:15px;font-weight:700;margin-bottom:6px">Akses Ditolak</div>' +
+      '<div class="txt">' + escapeHtml(pesan) + '</div>' +
+      '</div>';
+  }
+
+  document.getElementById('periodRow').addEventListener('click', (e) => {
+    const chip = e.target.closest('.period-chip');
+    if (!chip) return;
+    document.querySelectorAll('.period-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    hariAktif = parseInt(chip.dataset.hari);
+    muatData();
+  });
+
+  document.getElementById('tabsRow').addEventListener('click', (e) => {
+    const tab = e.target.closest('.tab');
+    if (!tab) return;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    tabAktif = tab.dataset.tab;
+    render();
+  });
+
+  function muatData() {
+    if (!chatId) {
+      tampilAksesDitolak('Link ini enggak lengkap. Buka dashboard lewat command /dashboard di chat bot, jangan lewat tombol menu biasa.');
+      return;
+    }
+    document.getElementById('mainContent').innerHTML = '<div class="loading"><div class="spinner"></div> Memuat data...</div>';
+    fetch(APPS_SCRIPT_URL + '?action=dashboard_data&hari=' + hariAktif + '&chatId=' + encodeURIComponent(chatId))
+      .then(r => r.json())
+      .then(data => {
+        if (!data.success) {
+          tampilAksesDitolak(data.error || 'Gagal ambil data');
+          return;
+        }
+        dataTerakhir = data;
+        document.getElementById('updatedText').textContent = 'Diperbarui ' + data.generatedAt + (data.namaUser ? ' • ' + data.namaUser : '');
+        document.getElementById('cBelumLunas').textContent = data.ringkasan.jumlahPiutang + data.ringkasan.jumlahUtang;
+        document.getElementById('cKawat').textContent = data.ringkasan.jumlahKawat;
+        document.getElementById('cBeban').textContent = data.ringkasan.jumlahBeban;
+        document.getElementById('cBayar').textContent = data.ringkasan.jumlahBayarSupplier;
+        document.getElementById('cTerima').textContent = data.ringkasan.jumlahTerimaDkms;
+        render();
+      })
+      .catch(err => {
+        document.getElementById('mainContent').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div class="txt">Gagal terhubung ke server.<br>' + escapeHtml(err.message) + '</div></div>';
+      });
+  }
+
+  function emptyState(txt) {
+    return '<div class="empty-state"><div class="icon">📭</div><div class="txt">' + txt + '</div></div>';
+  }
+
+  function render() {
+    if (!dataTerakhir) return;
+    const d = dataTerakhir;
+    let html = '';
+
+    if (tabAktif === 'ringkasan') {
+      html += '<div class="summary-grid">';
+      html += '<div class="summary-card red"><div class="label">Total Utang</div><div class="value">' + fRp(d.ringkasan.totalUtang) + '</div><div class="count">' + d.ringkasan.jumlahUtang + ' faktur</div></div>';
+      html += '<div class="summary-card green"><div class="label">Total Piutang</div><div class="value">' + fRp(d.ringkasan.totalPiutang) + '</div><div class="count">' + d.ringkasan.jumlahPiutang + ' faktur</div></div>';
+      html += '</div>';
+
+      html += '<div class="mini-stats">';
+      html += '<div class="mini-stat"><div class="n">' + d.ringkasan.jumlahKawat + '</div><div class="l">Kawat</div></div>';
+      html += '<div class="mini-stat"><div class="n">' + d.ringkasan.jumlahBeban + '</div><div class="l">Beban</div></div>';
+      html += '<div class="mini-stat"><div class="n">' + d.ringkasan.jumlahBayarSupplier + '</div><div class="l">Bayar</div></div>';
+      html += '<div class="mini-stat"><div class="n">' + d.ringkasan.jumlahTerimaDkms + '</div><div class="l">Terima</div></div>';
+      html += '</div>';
+
+      html += '<div class="section-title">Utang Terbesar</div>';
+      const topUtang = [...d.utang].sort((a,b) => b.sisa - a.sisa).slice(0, 5);
+      html += topUtang.length ? '<div class="card-list">' + topUtang.map(cardFaktur).join('') + '</div>' : emptyState('Enggak ada utang outstanding');
+
+      html += '<div class="section-title">Piutang Terbesar</div>';
+      const topPiutang = [...d.piutang].sort((a,b) => b.sisa - a.sisa).slice(0, 5);
+      html += topPiutang.length ? '<div class="card-list">' + topPiutang.map(cardFaktur).join('') + '</div>' : emptyState('Enggak ada piutang outstanding');
+    }
+
+    else if (tabAktif === 'belumlunas') {
+      html += '<div class="section-title">🔴 Utang ke Supplier (' + d.ringkasan.jumlahUtang + ')</div>';
+      html += d.utang.length ? '<div class="card-list">' + d.utang.map(cardFaktur).join('') + '</div>' : emptyState('Enggak ada utang');
+      html += '<div class="section-title">🟢 Piutang dari DKMS (' + d.ringkasan.jumlahPiutang + ')</div>';
+      html += d.piutang.length ? '<div class="card-list">' + d.piutang.map(cardFaktur).join('') + '</div>' : emptyState('Enggak ada piutang');
+    }
+
+    else if (tabAktif === 'kawat') {
+      html += d.kawat.length ? '<div class="card-list">' + d.kawat.map(cardKawat).join('') + '</div>' : emptyState('Enggak ada pembelian kawat di periode ini');
+    }
+
+    else if (tabAktif === 'beban') {
+      html += d.beban.length ? '<div class="card-list">' + d.beban.map(cardBeban).join('') + '</div>' : emptyState('Enggak ada beban di periode ini');
+    }
+
+    else if (tabAktif === 'bayarsupplier') {
+      html += d.bayarSupplier.length ? '<div class="card-list">' + d.bayarSupplier.map(cardBayarSupplier).join('') + '</div>' : emptyState('Enggak ada pembayaran di periode ini');
+    }
+
+    else if (tabAktif === 'terimadkms') {
+      html += d.terimaDkms.length ? '<div class="card-list">' + d.terimaDkms.map(cardTerimaDkms).join('') + '</div>' : emptyState('Enggak ada penerimaan di periode ini');
+    }
+
+    html += '<div class="updated-note">Data faktur belum lunas diambil langsung dari Accurate (real-time). Data lainnya dari histori bot.</div>';
+    document.getElementById('mainContent').innerHTML = html;
+  }
+
+  function cardFaktur(inv) {
+    return '<div class="card">' +
+      '<div class="card-top">' +
+        '<div><div class="card-title">' + escapeHtml(inv.pihak) + '</div><div class="card-sub">' + escapeHtml(inv.nomor) + ' &middot; ' + escapeHtml(inv.tanggal) + '</div></div>' +
+        '<div class="card-amount red">' + fRp(inv.sisa) + '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function cardKawat(k) {
+    const statusOk = String(k.statusImport || '').indexOf('Sudah') === 0;
+    return '<div class="card">' +
+      '<div class="card-top">' +
+        '<div><div class="card-title">' + escapeHtml(k.supplier) + '</div><div class="card-sub">BWG' + escapeHtml(k.gauge) + ' &middot; ' + k.jumlahRoll + ' roll &middot; ' + escapeHtml(k.tanggal) + '</div></div>' +
+        '<div class="card-amount">' + fRp(k.totalNilai) + '</div>' +
+      '</div>' +
+      '<div class="card-meta">' +
+        '<span class="badge ' + (statusOk ? 'green' : 'red') + '">' + (statusOk ? '✓ Accurate' : '✗ Gagal push') + '</span>' +
+        (k.kenaPPN === 'Ya' ? '<span class="badge amber">Kena PPN</span>' : '') +
+      '</div>' +
+    '</div>';
+  }
+
+  function cardBeban(b) {
+    return '<div class="card">' +
+      '<div class="card-top">' +
+        '<div><div class="card-title">' + escapeHtml(b['Nama Beban']) + '</div><div class="card-sub">' + escapeHtml(b['Keterangan'] || '-') + ' &middot; ' + escapeHtml(b['Tanggal']) + '</div></div>' +
+        '<div class="card-amount">' + fRp(b['Nominal']) + '</div>' +
+      '</div>' +
+      '<div class="card-meta"><span class="badge gray">' + escapeHtml(b['No Journal Accurate']) + '</span></div>' +
+    '</div>';
+  }
+
+  function cardBayarSupplier(p) {
+    return '<div class="card">' +
+      '<div class="card-top">' +
+        '<div><div class="card-title">' + escapeHtml(p['Supplier']) + '</div><div class="card-sub">' + escapeHtml(p['No Invoice']) + ' &middot; ' + escapeHtml(p['Tanggal']) + '</div></div>' +
+        '<div class="card-amount red">' + fRp(p['Nominal']) + '</div>' +
+      '</div>' +
+      '<div class="card-meta">' +
+        '<span class="badge gray">' + escapeHtml(p['No Payment Accurate']) + '</span>' +
+        '<span class="badge ' + (p['Lampiran Foto'] === 'Ya' ? 'green' : 'amber') + '">' + (p['Lampiran Foto'] === 'Ya' ? '📎 Ada bukti' : '⚠️ Tanpa bukti') + '</span>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function cardTerimaDkms(t) {
+    return '<div class="card">' +
+      '<div class="card-top">' +
+        '<div><div class="card-title">DKMS</div><div class="card-sub">' + escapeHtml(t['No Invoice']) + ' &middot; ' + escapeHtml(t['Tanggal']) + '</div></div>' +
+        '<div class="card-amount green">' + fRp(t['Nominal']) + '</div>' +
+      '</div>' +
+      '<div class="card-meta">' +
+        '<span class="badge gray">' + escapeHtml(t['No Receipt Accurate']) + '</span>' +
+        '<span class="badge ' + (t['Lampiran Foto'] === 'Ya' ? 'green' : 'amber') + '">' + (t['Lampiran Foto'] === 'Ya' ? '📎 Ada bukti' : '⚠️ Tanpa bukti') + '</span>' +
+      '</div>' +
+    '</div>';
+  }
+
+  muatData();
+</script>
+</body>
+</html>
