@@ -180,11 +180,11 @@
   const tg = window.Telegram ? window.Telegram.WebApp : null;
   if (tg) { tg.ready(); tg.expand(); }
 
-  // chatId disuntik LANGSUNG dari server (Apps Script) waktu HTML ini
-  // dirender, BUKAN diambil dari Telegram WebApp bridge -- soalnya Apps
-  // Script selalu redirect ke domain googleusercontent.com yang bikin
-  // Telegram enggak ngasih data initData yang valid.
-  const chatId = '<?= chatIdDariServer ?>' || null;
+  // chatId diambil dari URL (?chatId=123456), digenerate personal per
+  // orang oleh bot lewat command /dashboard. Halaman ini di-host di
+  // GitHub Pages (situs statis biasa), jadi query string di URL aman
+  // enggak ke-drop kayak pas di-host langsung di Apps Script.
+  const chatId = new URLSearchParams(window.location.search).get('chatId');
 
   let hariAktif = 30;
   let tabAktif = 'ringkasan';
