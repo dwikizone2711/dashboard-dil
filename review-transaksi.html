@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Review Transaksi - DKMS</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #0f1115);
+    --secondary-bg: var(--tg-theme-secondary-bg-color, #171a21);
+    --text: var(--tg-theme-text-color, #e8eaed);
+    --hint: var(--tg-theme-hint-color, #7d8695);
+    --link: var(--tg-theme-link-color, #5eb5f7);
+    --button: var(--tg-theme-button-color, #2b8a3e);
+    --button-text: var(--tg-theme-button-text-color, #ffffff);
+    --border: var(--tg-theme-section-separator-color, #2a2e37);
+    --accent: #d9a441;
+    --danger: #e5533d;
+    --ok: #3ba55c;
+    --radius: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.45;
+    padding-bottom: 100px;
+  }
+  .topbar {
+    padding: 18px 16px 14px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .topbar h1 {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 700;
+  }
+  .topbar .sub {
+    color: var(--hint);
+    font-size: 13px;
+    margin-top: 2px;
+  }
+  .content { padding: 16px; }
+  .card {
+    background: var(--secondary-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--hint);
+    margin-bottom: 6px;
+  }
+  .field input, .field textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 9px;
+    padding: 11px 12px;
+    color: var(--text);
+    font-size: 15px;
+    font-family: inherit;
+    transition: border-color 0.15s;
+  }
+  .field input:focus, .field textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .field input.num { font-variant-numeric: tabular-nums; }
+  .field textarea { resize: vertical; min-height: 60px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .readonly-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13.5px;
+    color: var(--hint);
+  }
+  .readonly-pill b { color: var(--text); font-weight: 600; }
+
+  .section-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+  .section-title h2 { font-size: 14px; margin: 0; font-weight: 700; }
+  .section-title .count { font-size: 12px; color: var(--hint); }
+
+  .item-row {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+  .item-row .item-index {
+    position: absolute;
+    top: -9px;
+    left: 10px;
+    background: var(--secondary-bg);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 0 6px;
+  }
+  .item-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .item-grid .qty-harga { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .item-row input { font-size: 14px; padding: 9px 10px; }
+  .item-row .mini-label { font-size: 10.5px; color: var(--hint); margin-bottom: 3px; display: block; }
+  .remove-item {
+    background: none;
+    border: none;
+    color: var(--danger);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 6px 0 0;
+    cursor: pointer;
+  }
+  .add-item {
+    width: 100%;
+    background: none;
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    color: var(--link);
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .total-line {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 12px;
+    margin-top: 4px;
+    border-top: 1px dashed var(--border);
+    font-size: 14px;
+  }
+  .total-line b { font-variant-numeric: tabular-nums; }
+
+  .footer {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, var(--bg) 60%, transparent);
+  }
+  .btn-confirm {
+    width: 100%;
+    background: var(--button);
+    color: var(--button-text);
+    border: none;
+    border-radius: 12px;
+    padding: 15px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .btn-confirm:disabled { opacity: 0.5; }
+  .warn-note {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    background: rgba(217, 164, 65, 0.1);
+    border: 1px solid rgba(217, 164, 65, 0.35);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+
+  .state-screen {
+    padding: 60px 24px;
+    text-align: center;
+  }
+  .state-screen .icon { font-size: 40px; margin-bottom: 14px; }
+  .state-screen h2 { font-size: 17px; margin: 0 0 6px; }
+  .state-screen p { color: var(--hint); font-size: 13.5px; margin: 0; }
+  .spinner {
+    width: 26px; height: 26px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 14px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #app { display: none; }
+</style>
+</head>
+<body>
+
+<div id="loading" class="state-screen">
+  <div class="spinner"></div>
+  <h2>Ambil data...</h2>
+  <p>Sebentar, lagi narik data transaksi.</p>
+</div>
+
+<div id="errorScreen" class="state-screen" style="display:none;">
+  <div class="icon">⚠️</div>
+  <h2 id="errorTitle">Gagal ambil data</h2>
+  <p id="errorMsg">Coba tutup dan buka lagi dari chat.</p>
+</div>
+
+<div id="doneScreen" class="state-screen" style="display:none;">
+  <div class="icon" id="doneIcon">✅</div>
+  <h2 id="doneTitle">Tersimpan</h2>
+  <p id="doneMsg">Transaksi udah kepush ke Accurate.</p>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div class="eyebrow" id="eyebrow">REVIEW SEBELUM PUSH</div>
+    <h1 id="pageTitle">Cek Datanya Dulu</h1>
+    <div class="sub" id="pageSub">Betulin kalau ada yang salah baca, baru kirim.</div>
+  </div>
+
+  <div class="content">
+    <div class="warn-note">
+      ⚠️ <span>Ini hasil baca otomatis dari foto. Cek lagi terutama angka &amp; nama sebelum dikirim ke Accurate - kalau udah kepush, harus dikoreksi manual di Accurate.</span>
+    </div>
+
+    <!-- ===== NOTA ===== -->
+    <div id="formNota" style="display:none;">
+      <div class="card">
+        <div class="field">
+          <label>Nama Supplier</label>
+          <input type="text" id="n_supplier">
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Tanggal</label>
+            <input type="date" id="n_tanggal">
+          </div>
+          <div class="field">
+            <label>No. Nota</label>
+            <input type="text" id="n_nomorNota" placeholder="opsional">
+          </div>
+        </div>
+        <div class="field">
+          <label>Keterangan</label>
+          <textarea id="n_keterangan" placeholder="opsional"></textarea>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <h2>Barang</h2>
+          <span class="count" id="itemCount">0 item</span>
+        </div>
+        <div id="itemList"></div>
+        <button class="add-item" id="btnAddItem" type="button">+ Tambah Barang</button>
+        <div class="total-line">
+          <span>Total Estimasi</span>
+          <b id="totalEstimasi">Rp 0</b>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== BEBAN / ASET ===== -->
+    <div id="formSederhana" style="display:none;">
+      <div class="card">
+        <div class="field">
+          <label>Nominal</label>
+          <input type="number" inputmode="numeric" class="num" id="s_nominal">
+        </div>
+        <div class="field">
+          <label>Tanggal</label>
+          <input type="date" id="s_tanggal">
+        </div>
+        <div class="field">
+          <label>Keterangan</label>
+          <textarea id="s_keterangan"></textarea>
+        </div>
+        <div class="field" id="s_kategoriWrap">
+          <label>Kategori (udah dipilih di chat)</label>
+          <div class="readonly-pill">📁 <b id="s_kategoriLabel"></b></div>
+        </div>
+        <div class="field">
+          <label>Dibayar dari (udah dipilih di chat)</label>
+          <div class="readonly-pill">💳 <b id="s_akunLabel"></b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button class="btn-confirm" id="btnConfirm" type="button">Konfirmasi &amp; Kirim ke Accurate</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var tg = window.Telegram && window.Telegram.WebApp;
+  if (tg) { tg.ready(); tg.expand(); }
+
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
+
+  var params = new URLSearchParams(window.location.search);
+  var token = params.get('token');
+  var tipe = params.get('tipe'); // 'nota' | 'beban' | 'aset'
+
+  var itemIdCounter = 0;
+
+  function fmtRupiah(n) {
+    n = Math.round(Number(n) || 0);
+    return 'Rp ' + n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
+  function showError(title, msg) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('errorTitle').textContent = title;
+    document.getElementById('errorMsg').textContent = msg;
+    document.getElementById('errorScreen').style.display = 'block';
+  }
+
+  function showDone(ok, title, msg) {
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('doneIcon').textContent = ok ? '✅' : '❌';
+    document.getElementById('doneTitle').textContent = title;
+    document.getElementById('doneMsg').textContent = msg;
+    document.getElementById('doneScreen').style.display = 'block';
+    if (tg) {
+      setTimeout(function () { tg.close(); }, 2200);
+    }
+  }
+
+  if (!token || !tipe) {
+    showError('Link nggak lengkap', 'Buka Mini App ini dari tombol di chat, bukan link langsung.');
+    return;
+  }
+
+  // ---------- render item row (nota) ----------
+  function addItemRow(data) {
+    data = data || { namaBarang: '', qty: 1, hargaSatuan: 0 };
+    itemIdCounter++;
+    var id = 'item_' + itemIdCounter;
+    var wrap = document.createElement('div');
+    wrap.className = 'item-row';
+    wrap.dataset.id = id;
+    wrap.innerHTML =
+      '<div class="item-index">#' + itemIdCounter + '</div>' +
+      '<div class="item-grid">' +
+        '<div><span class="mini-label">SKU / Nama Barang</span>' +
+        '<input type="text" class="f-nama" value="' + escapeAttr(data.namaBarang) + '"></div>' +
+        '<div class="qty-harga">' +
+          '<div><span class="mini-label">Qty</span><input type="number" inputmode="decimal" class="f-qty num" value="' + data.qty + '"></div>' +
+          '<div><span class="mini-label">Harga Satuan</span><input type="number" inputmode="numeric" class="f-harga num" value="' + Math.round(data.hargaSatuan) + '"></div>' +
+        '</div>' +
+      '</div>' +
+      '<button type="button" class="remove-item">Hapus barang ini</button>';
+    document.getElementById('itemList').appendChild(wrap);
+
+    wrap.querySelector('.remove-item').addEventListener('click', function () {
+      wrap.remove();
+      updateItemCountAndTotal();
+    });
+    ['f-qty', 'f-harga'].forEach(function (cls) {
+      wrap.querySelector('.' + cls).addEventListener('input', updateItemCountAndTotal);
+    });
+    updateItemCountAndTotal();
+  }
+
+  function escapeAttr(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  }
+
+  function updateItemCountAndTotal() {
+    var rows = document.querySelectorAll('#itemList .item-row');
+    document.getElementById('itemCount').textContent = rows.length + ' item';
+    var total = 0;
+    rows.forEach(function (r) {
+      var qty = parseFloat(r.querySelector('.f-qty').value) || 0;
+      var harga = parseFloat(r.querySelector('.f-harga').value) || 0;
+      total += qty * harga;
+    });
+    document.getElementById('totalEstimasi').textContent = fmtRupiah(total);
+  }
+
+  function collectItems() {
+    var rows = document.querySelectorAll('#itemList .item-row');
+    var items = [];
+    rows.forEach(function (r) {
+      items.push({
+        namaBarang: r.querySelector('.f-nama').value.trim(),
+        qty: parseFloat(r.querySelector('.f-qty').value) || 0,
+        hargaSatuan: parseFloat(r.querySelector('.f-harga').value) || 0
+      });
+    });
+    return items;
+  }
+
+  // ---------- load pending data ----------
+  fetch(GAS_URL + '?action=ambil_pending_review&token=' + encodeURIComponent(token))
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      if (!res || !res.success) {
+        showError('Data nggak ketemu', (res && res.error) || 'Mungkin udah kepush atau kadaluarsa. Cek langsung di chat.');
+        return;
+      }
+      renderForm(res.tipe, res.data);
+    })
+    .catch(function () {
+      showError('Gagal konek', 'Cek koneksi internet, lalu buka lagi Mini App-nya dari chat.');
+    });
+
+  function renderForm(tipeData, data) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+
+    if (tipeData === 'nota') {
+      document.getElementById('pageTitle').textContent = 'Review Nota Pembelian';
+      document.getElementById('pageSub').textContent = data.namaSupplier || '';
+      document.getElementById('formNota').style.display = 'block';
+
+      document.getElementById('n_supplier').value = data.namaSupplier || '';
+      document.getElementById('n_tanggal').value = data.tanggal || '';
+      document.getElementById('n_nomorNota').value = data.nomorNota || '';
+      document.getElementById('n_keterangan').value = data.keterangan || '';
+
+      (data.items || []).forEach(function (it) { addItemRow(it); });
+      if (!data.items || data.items.length === 0) addItemRow();
+
+      document.getElementById('btnAddItem').addEventListener('click', function () { addItemRow(); });
+
+    } else {
+      // beban / aset - struktur form sama, beda label doang
+      document.getElementById('pageTitle').textContent = tipeData === 'aset' ? 'Review Pembelian Aset' : 'Review Beban Operasional';
+      document.getElementById('pageSub').textContent = data.keterangan || '';
+      document.getElementById('formSederhana').style.display = 'block';
+
+      document.getElementById('s_nominal').value = Math.round(data.nominal || 0);
+      document.getElementById('s_tanggal').value = data.tanggal || '';
+      document.getElementById('s_keterangan').value = data.keterangan || '';
+      document.getElementById('s_kategoriLabel').textContent = data.kategoriLabel || '-';
+      document.getElementById('s_akunLabel').textContent = data.akunBayarLabel || '-';
+
+      if (tipeData !== 'aset' && tipeData !== 'beban') {
+        document.getElementById('s_kategoriWrap').style.display = 'none';
+      }
+    }
+  }
+
+  // ---------- submit ----------
+  document.getElementById('btnConfirm').addEventListener('click', function () {
+    var btn = this;
+    var payload = { action: 'konfirmasi_review', token: token, tipe: tipe };
+
+    if (tipe === 'nota') {
+      var items = collectItems();
+      if (items.length === 0) {
+        alert('Barangnya kosong, tambahin minimal 1.');
+        return;
+      }
+      for (var i = 0; i < items.length; i++) {
+        if (!items[i].namaBarang) {
+          alert('Ada baris barang yang nama/SKU-nya kosong (baris ' + (i + 1) + ').');
+          return;
+        }
+      }
+      payload.data = {
+        namaSupplier: document.getElementById('n_supplier').value.trim(),
+        tanggal: document.getElementById('n_tanggal').value,
+        nomorNota: document.getElementById('n_nomorNota').value.trim(),
+        keterangan: document.getElementById('n_keterangan').value.trim(),
+        items: items
+      };
+      if (!payload.data.namaSupplier) { alert('Nama supplier belum diisi.'); return; }
+      if (!payload.data.tanggal) { alert('Tanggal belum diisi.'); return; }
+    } else {
+      payload.data = {
+        nominal: parseFloat(document.getElementById('s_nominal').value) || 0,
+        tanggal: document.getElementById('s_tanggal').value,
+        keterangan: document.getElementById('s_keterangan').value.trim()
+      };
+      if (!payload.data.nominal) { alert('Nominal belum diisi.'); return; }
+      if (!payload.data.tanggal) { alert('Tanggal belum diisi.'); return; }
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Ngirim...';
+
+    fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // hindari CORS preflight ke Apps Script
+      body: JSON.stringify(payload)
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res && res.success) {
+          showDone(true, 'Berhasil!', res.reply || 'Transaksi udah kepush ke Accurate.');
+        } else {
+          btn.disabled = false;
+          btn.textContent = 'Konfirmasi & Kirim ke Accurate';
+          alert('Gagal: ' + ((res && res.error) || 'Nggak diketahui sebabnya, coba lagi.'));
+        }
+      })
+      .catch(function () {
+        btn.disabled = false;
+        btn.textContent = 'Konfirmasi & Kirim ke Accurate';
+        alert('Gagal konek ke server. Cek internet, coba lagi.');
+      });
+  });
+})();
+</script>
+</body>
+</html>
