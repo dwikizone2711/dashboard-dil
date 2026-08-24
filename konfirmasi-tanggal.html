@@ -279,6 +279,11 @@ const CONFIG = {
     icon: '🏧',
     title: 'Transfer LKAB → DKMS',
     sub: 'Konfirmasi tanggal transfer'
+  },
+  bayar_qmove: {
+    icon: '💳',
+    title: 'Pembayaran Qmove',
+    sub: 'Konfirmasi tanggal pembayaran'
   }
 };
 
@@ -366,9 +371,14 @@ async function submitKonfirmasi() {
   showStatus('loading', '<span class="spinner"></span>Menyimpan ke Accurate...');
 
   try {
+    // PENTING: pakai Content-Type text/plain (BUKAN application/json) supaya
+    // browser tidak kirim CORS preflight (OPTIONS request) -- Google Apps
+    // Script Web App tidak bisa menjawab preflight, jadi kalau pakai
+    // application/json fetch-nya akan selalu gagal dengan "Failed to fetch".
+    // GAS tetap bisa parse isinya sebagai JSON walau header bilang text/plain.
     const res = await fetch(GAS_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
         action: 'konfirmasi_tanggal_transaksi',
         token: token,
