@@ -11,6 +11,9 @@
   .field { margin-bottom:16px; }
   .field label { display:block; font-size:12.5px; font-weight:700; color:var(--hint); text-transform:uppercase; letter-spacing:0.3px; margin-bottom:7px; }
   input[type=number], input[type=date] { width:100%; padding:12px 14px; border-radius:10px; background:var(--card); border:1.5px solid var(--border); color:var(--text); font-size:16px; font-family:inherit; color-scheme:dark; }
+  select { width:100%; padding:12px 14px; border-radius:10px; background:var(--card); border:1.5px solid var(--border); color:var(--text); font-size:15px; font-family:inherit; -webkit-appearance:none; appearance:none; background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238a8f98' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 14px center; padding-right:36px; }
+  .divider-section { height:1px; background:var(--border); margin:20px 0 16px; }
+  .section-label { font-size:12.5px; font-weight:700; color:var(--hint); text-transform:uppercase; letter-spacing:0.3px; margin-bottom:10px; }
   input:focus { outline:none; border-color:var(--button); }
   .btn-group { display:flex; gap:8px; flex-wrap:wrap; }
   .choice-btn { flex:1; min-width:28%; padding:14px 8px; border-radius:10px; background:var(--card); border:1.5px solid var(--border); color:var(--text); font-size:14px; font-weight:700; text-align:center; cursor:pointer; }
@@ -46,6 +49,7 @@
 <div id="app"><div class="loading"><div class="spinner"></div> Memuat...</div></div>
 <script>
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby2wyVacT1kFqYt5481dypHMCp5T_Eg_KertLLWXNE0yu3YqKg4RiDNiqKWPlwGvhCxqw/exec';
+  const KODE_AKUN_TERIMA_REJECT = '110127'; // Kas Kecil (Suci K) -- penjualan reject selalu masuk sini
   const tg = window.Telegram ? window.Telegram.WebApp : null;
   if (tg) { tg.ready(); tg.expand(); }
   const chatId = new URLSearchParams(window.location.search).get('chatId');
@@ -101,6 +105,22 @@
         <input type="number" id="inputHarga" inputmode="numeric" placeholder="Contoh: 8000" step="100" min="1">
         <div class="live-calc" id="calcTotal" style="display:none"></div>
       </div>
+      <div class="divider-section"></div>
+      <div class="section-label">Potongan dari Zaenal (opsional)</div>
+      <div class="field">
+        <label>Potongan Pengiriman (Rp)</label>
+        <input type="number" id="inputPotonganKirim" inputmode="numeric" placeholder="0" step="1000" min="0">
+      </div>
+      <div class="field">
+        <label>Potongan Makan/Minum (Rp)</label>
+        <input type="number" id="inputPotonganMakinum" inputmode="numeric" placeholder="0" step="1000" min="0">
+        <div class="live-calc" id="calcNet" style="display:none"></div>
+      </div>
+      <div class="field">
+        <label>Uang Masuk ke Akun</label>
+        <div class="live-calc" style="display:block; color:var(--text);">💰 Kas Kecil (Suci K)</div>
+      </div>
+      <div class="divider-section"></div>
       <div class="field">
         <label class="checkbox-row"><input type="checkbox" id="inputTutup"> Ini penjualan terakhir, stok jadi 0 (habis)</label>
       </div>
@@ -117,14 +137,27 @@
     function updateCalc() {
       const berat = parseFloat(document.getElementById('inputBerat').value);
       const harga = parseFloat(document.getElementById('inputHarga').value);
+      const potKirim = parseFloat(document.getElementById('inputPotonganKirim').value) || 0;
+      const potMakinum = parseFloat(document.getElementById('inputPotonganMakinum').value) || 0;
       const calcTotal = document.getElementById('calcTotal');
+      const calcNet = document.getElementById('calcNet');
       if (berat > 0 && harga > 0) {
+        const total = berat * harga;
         calcTotal.style.display = 'block';
-        calcTotal.innerHTML = 'Total: <b>' + fRp(berat * harga) + '</b>';
-      } else { calcTotal.style.display = 'none'; }
+        calcTotal.innerHTML = 'Total Penjualan: <b>' + fRp(total) + '</b>';
+        const totalPotongan = potKirim + potMakinum;
+        if (totalPotongan > 0) {
+          calcNet.style.display = 'block';
+          calcNet.innerHTML = 'Potongan: <b>' + fRp(totalPotongan) + '</b> &nbsp;→&nbsp; Diterima Bersih: <b>' + fRp(total - totalPotongan) + '</b>';
+        } else {
+          calcNet.style.display = 'none';
+        }
+      } else { calcTotal.style.display = 'none'; calcNet.style.display = 'none'; }
     }
     document.getElementById('inputBerat').addEventListener('input', updateCalc);
     document.getElementById('inputHarga').addEventListener('input', updateCalc);
+    document.getElementById('inputPotonganKirim').addEventListener('input', updateCalc);
+    document.getElementById('inputPotonganMakinum').addEventListener('input', updateCalc);
     document.getElementById('btnSubmit').addEventListener('click', submitData);
   }
 
@@ -134,11 +167,17 @@
     const tanggal = document.getElementById('inputTanggal').value;
     const beratKg = document.getElementById('inputBerat').value;
     const hargaPerKg = document.getElementById('inputHarga').value;
+    const potonganPengiriman = document.getElementById('inputPotonganKirim').value || '0';
+    const potonganMakinum = document.getElementById('inputPotonganMakinum').value || '0';
+    const kodeAkunTerima = KODE_AKUN_TERIMA_REJECT;
     const tutupStok = document.getElementById('inputTutup').checked;
     if (!tanggal) { errorArea.innerHTML = '<div class="error-box">Pilih tanggal dulu.</div>'; return; }
     if (!state.gauge) { errorArea.innerHTML = '<div class="error-box">Pilih gauge dulu.</div>'; return; }
     if (!beratKg || parseFloat(beratKg) <= 0) { errorArea.innerHTML = '<div class="error-box">Isi berat dulu.</div>'; return; }
     if (!hargaPerKg || parseFloat(hargaPerKg) <= 0) { errorArea.innerHTML = '<div class="error-box">Isi harga dulu.</div>'; return; }
+    const totalNilaiCek = parseFloat(beratKg) * parseFloat(hargaPerKg);
+    const totalPotonganCek = parseFloat(potonganPengiriman) + parseFloat(potonganMakinum);
+    if (totalPotonganCek > totalNilaiCek) { errorArea.innerHTML = '<div class="error-box">Total potongan lebih besar dari nilai penjualan.</div>'; return; }
 
     const btn = document.getElementById('btnSubmit');
     btn.disabled = true; btn.textContent = 'Mengirim...';
@@ -149,7 +188,10 @@
       + '&hargaPerKg=' + encodeURIComponent(hargaPerKg)
       + '&namaAdmin=' + encodeURIComponent(namaAdmin)
       + '&tutupStok=' + (tutupStok ? 'true' : 'false')
-      + '&tanggal=' + encodeURIComponent(tanggal);
+      + '&tanggal=' + encodeURIComponent(tanggal)
+      + '&potonganPengiriman=' + encodeURIComponent(potonganPengiriman)
+      + '&potonganMakinum=' + encodeURIComponent(potonganMakinum)
+      + '&kodeAkunTerima=' + encodeURIComponent(kodeAkunTerima);
 
     fetch(url).then(r => r.json()).then(res => {
       if (!res || !res.success) {
@@ -167,6 +209,7 @@
   function renderReceipt(r) {
     const accStatus = r.accuratePush && r.accuratePush.success ? '✅ #' + escapeHtml(r.accuratePush.accurateNumber) : '❌ ' + escapeHtml(r.accuratePush ? r.accuratePush.error : 'Gagal');
     const adjStatus = r.accuratePushAdjustment ? (r.accuratePushAdjustment.success ? '✅ #' + escapeHtml(r.accuratePushAdjustment.accurateNumber) : '❌ ' + escapeHtml(r.accuratePushAdjustment.error)) : 'Tidak dijalankan';
+    const adaPotongan = (r.potonganPengiriman > 0) || (r.potonganMakinum > 0);
     let html = '<div class="receipt">';
     html += '<div class="status-badge">✅ Tercatat</div>';
     html += '<div class="receipt-row"><div class="l">No Invoice</div><div class="v">' + escapeHtml(r.noInvoice) + '</div></div>';
@@ -175,7 +218,24 @@
     html += '<div class="receipt-row"><div class="l">Berat</div><div class="v">' + r.beratKg + ' kg</div></div>';
     html += '<div class="receipt-row"><div class="l">Harga/kg</div><div class="v">' + fRp(r.hargaPerKg) + '</div></div>';
     html += '<div class="receipt-row"><div class="l">TOTAL</div><div class="v total">' + fRp(r.totalNilai) + '</div></div>';
+    if (adaPotongan) {
+      if (r.potonganPengiriman > 0) html += '<div class="receipt-row"><div class="l">Potongan Pengiriman</div><div class="v">- ' + fRp(r.potonganPengiriman) + '</div></div>';
+      if (r.potonganMakinum > 0) html += '<div class="receipt-row"><div class="l">Potongan Makan/Minum</div><div class="v">- ' + fRp(r.potonganMakinum) + '</div></div>';
+      html += '<div class="receipt-row"><div class="l">Diterima Bersih</div><div class="v total">' + fRp(r.netDiterima) + '</div></div>';
+    }
     html += '<div class="receipt-row"><div class="l">Push Invoice</div><div class="v">' + accStatus + '</div></div>';
+    if (r.penerimaan) {
+      const penStatus = r.penerimaan.success ? '✅ #' + escapeHtml(r.penerimaan.accurateNumber) : '❌ ' + escapeHtml(r.penerimaan.error);
+      html += '<div class="receipt-row"><div class="l">Penerimaan Kas</div><div class="v">' + penStatus + '</div></div>';
+    }
+    if (r.jurnalPengiriman) {
+      const jStatus = r.jurnalPengiriman.success ? '✅ #' + escapeHtml(r.jurnalPengiriman.accurateNumber) : '❌ ' + escapeHtml(r.jurnalPengiriman.error);
+      html += '<div class="receipt-row"><div class="l">Jurnal Beban Pengiriman</div><div class="v">' + jStatus + '</div></div>';
+    }
+    if (r.jurnalMakinum) {
+      const jStatus = r.jurnalMakinum.success ? '✅ #' + escapeHtml(r.jurnalMakinum.accurateNumber) : '❌ ' + escapeHtml(r.jurnalMakinum.error);
+      html += '<div class="receipt-row"><div class="l">Jurnal Beban Retribusi</div><div class="v">' + jStatus + '</div></div>';
+    }
     html += '<div class="receipt-row"><div class="l">Penyesuaian Stok</div><div class="v">' + adjStatus + '</div></div>';
     html += '</div>';
     html += '<button class="new-btn" onclick="renderForm()">+ Catat Baru</button>';
