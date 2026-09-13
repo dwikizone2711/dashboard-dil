@@ -179,7 +179,7 @@ const chatId = params.get('chatId') || '';
 const akun = (params.get('akun') || 'bca').toLowerCase();
 const AKUN_CONFIG_DIL = {
   bca:      { label: 'Catat Beban BCA DIL',       kodeAkunBayar: '110102' }, // BCA CV DIL a/c 7285649170
-  kaskecil: { label: 'Catat Beban KAS KECIL DIL', kodeAkunBayar: 'GANTI_KODE_AKUN_KAS_KECIL_DIL' }
+  kaskecil: { label: 'Catat Beban KAS KECIL DIL', kodeAkunBayar: '110127' } // Kas Kecil (Suci K)
 };
 const akunConfig = AKUN_CONFIG_DIL[akun] || AKUN_CONFIG_DIL.bca;
 
