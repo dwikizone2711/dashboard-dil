@@ -119,7 +119,7 @@
   <div class="header">
     <div class="header-icon">💸</div>
     <div>
-      <div class="header-title">Catat Beban</div>
+      <div class="header-title" id="headerTitle">Catat Beban</div>
       <div class="header-sub" id="headerSub">Loading...</div>
     </div>
   </div>
@@ -174,6 +174,15 @@ const company = (params.get('company') || 'dkms').toLowerCase();
 const dicatatOleh = params.get('nama') || '-';
 const chatId = params.get('chatId') || '';
 
+// akun cuma dipakai buat DIL: 'bca' (default) atau 'kaskecil'.
+// Nentuin akun kredit (kodeAkunBayar) yang dikirim ke GAS & label header.
+const akun = (params.get('akun') || 'bca').toLowerCase();
+const AKUN_CONFIG_DIL = {
+  bca:      { label: 'Catat Beban BCA DIL',       kodeAkunBayar: '110102' }, // BCA CV DIL a/c 7285649170
+  kaskecil: { label: 'Catat Beban KAS KECIL DIL', kodeAkunBayar: 'GANTI_KODE_AKUN_KAS_KECIL_DIL' }
+};
+const akunConfig = AKUN_CONFIG_DIL[akun] || AKUN_CONFIG_DIL.bca;
+
 const GAS_URL_MAP = {
   dkms: 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec',
   dil:  'https://script.google.com/macros/s/AKfycby2wyVacT1kFqYt5481dypHMCp5T_Eg_KertLLWXNE0yu3YqKg4RiDNiqKWPlwGvhCxqw/exec'
@@ -187,6 +196,8 @@ const ACTION_DAFTAR_BEBAN = { dkms: 'daftar_kategori_beban_miniapp', dil: 'dafta
 
 document.getElementById('headerSub').textContent =
   company === 'dil' ? 'CV Dwikarya Inti Logam' : 'CV Dwi Karya Makmur Sejahtera';
+document.getElementById('headerTitle').textContent =
+  company === 'dil' ? akunConfig.label : 'Catat Beban';
 
 // ── Default tanggal = hari ini (WIB) ───────────────────────────
 function todayWIB() {
@@ -266,7 +277,7 @@ async function submitBeban() {
         namaBeban: namaKategoriBeban,
         kodeAkunBeban: kodeAkunBeban,
         nominal: nominal,
-        kodeAkunBayar: '110102', // BCA CV DIL a/c 7285649170
+        kodeAkunBayar: akunConfig.kodeAkunBayar,
         keterangan: keterangan,
         base64Image: fotoBase64,
         mimeType: fotoMime,
