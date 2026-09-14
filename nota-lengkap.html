@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Nota - DKMS</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a1a; padding: 16px; padding-bottom: 40px; }
+  h1 { font-size: 20px; margin-bottom: 4px; color: #1a3a5c; }
+  .subtitle { font-size: 13px; color: #666; margin-bottom: 16px; }
+  .card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 14px; color: #1a3a5c; margin-bottom: 12px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #333; margin-bottom: 6px; margin-top: 12px; }
+  label:first-child { margin-top: 0; }
+  input, textarea { width: 100%; padding: 11px; border: 1px solid #d0d0d0; border-radius: 8px; font-size: 15px; }
+  input:focus, textarea:focus { outline: none; border-color: #1a3a5c; }
+  .search-wrap { position: relative; }
+  .hasil-list { margin-top: 6px; }
+  .hasil-item { background: #f7f9fb; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; cursor: pointer; font-size: 13px; }
+  .hasil-item:active { background: #eaf1f8; }
+  .hasil-item .kode { font-size: 11px; color: #888; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; background: #eaf1f8; border: 1px solid #1a3a5c; border-radius: 20px; padding: 6px 12px; font-size: 13px; font-weight: 600; margin-top: 6px; }
+  .chip .x { cursor: pointer; color: #c0392b; font-weight: 700; }
+  .item-row { border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; margin-top: 10px; position: relative; }
+  .item-row .nama-terpilih { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+  .item-row .row-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .item-row .hapus-item { position: absolute; top: 8px; right: 8px; color: #c0392b; font-size: 12px; cursor: pointer; }
+  .btn-tambah { width: 100%; padding: 10px; background: #eaf1f8; color: #1a3a5c; border: 1px dashed #1a3a5c; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+  .total-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: 700; margin-top: 14px; padding-top: 10px; border-top: 1px solid #ddd; }
+  .toggle-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+  .toggle-btn { padding: 12px; text-align: center; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .toggle-btn.selected { border-color: #1a3a5c; background: #eaf1f8; }
+  .bank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .bank-card { border: 2px solid #e0e0e0; border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; font-size: 13px; }
+  .bank-card.selected { border-color: #1a3a5c; background: #eaf1f8; }
+  #pembayaranDetail { display: none; margin-top: 10px; }
+  #pembayaranDetail.active { display: block; }
+  input[type=file] { padding: 8px; font-size: 13px; }
+  button.submit-btn { width: 100%; margin-top: 6px; padding: 14px; background: #1a3a5c; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  button.submit-btn:disabled { background: #a0a0a0; }
+  .result { display: none; margin-top: 16px; padding: 14px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
+  .result.success { display: block; background: #e6f7ec; color: #1e7e34; }
+  .result.error { display: block; background: #fdecea; color: #c0392b; }
+</style>
+</head>
+<body>
+
+  <h1>✍️ Nota Pembelian</h1>
+  <div class="subtitle">CV Dwi Karya Makmur Sejahtera</div>
+
+  <div class="card">
+    <h2>Info Nota</h2>
+    <label>Tanggal</label>
+    <input type="date" id="tanggal">
+
+    <label>Supplier</label>
+    <div class="search-wrap">
+      <input type="text" id="supplierSearch" placeholder="Ketik nama supplier..." autocomplete="off">
+      <div class="hasil-list" id="supplierHasil"></div>
+      <div id="supplierChip"></div>
+    </div>
+
+    <label>No. Nota (opsional)</label>
+    <input type="text" id="nomorNota" placeholder="Kosongin kalau nggak ada">
+
+    <label>Foto Nota (opsional)</label>
+    <input type="file" id="fotoNota" accept="image/*" capture="environment">
+  </div>
+
+  <div class="card">
+    <h2>Barang</h2>
+    <div id="itemRows"></div>
+    <button class="btn-tambah" onclick="tambahItemRow()">+ Tambah Barang</button>
+    <div class="total-row"><span>Total</span><span id="totalDisplay">Rp 0</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Pembayaran</h2>
+    <div class="toggle-row">
+      <div class="toggle-btn selected" id="toggle-tempo" onclick="pilihTipeBayar('tempo')">Tempo</div>
+      <div class="toggle-btn" id="toggle-cash" onclick="pilihTipeBayar('cash')">Cash / DP</div>
+    </div>
+    <div id="pembayaranDetail">
+      <label>Nominal Dibayar (Rp)</label>
+      <input type="number" id="nominalBayar" inputmode="numeric">
+
+      <label>Bank</label>
+      <div class="bank-grid">
+        <div class="bank-card selected" id="bank-bca" onclick="pilihBank('bca')">🏦 BCA DKMS</div>
+        <div class="bank-card" id="bank-lkab" onclick="pilihBank('lkab')">🏧 LKAB Mandiri</div>
+      </div>
+
+      <label>Tanggal Bayar</label>
+      <input type="date" id="tanggalBayar">
+
+      <label>Foto Bukti Transfer (opsional)</label>
+      <input type="file" id="fotoBukti" accept="image/*" capture="environment">
+
+      <div id="dilWarning" style="display:none; margin-top:10px; font-size:12px; color:#c0392b;">
+        ⚠️ Supplier DIL nggak bisa dibayar dari sini — pakai tombol "Bayar Nota DIL (FIFO)" terpisah setelah faktur ini tersimpan.
+      </div>
+    </div>
+  </div>
+
+  <button class="submit-btn" id="submitBtn" onclick="submitNota()">Simpan Nota</button>
+
+  <div class="result" id="result"></div>
+
+<script>
+  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
+  const BANK = { bca: '110105', lkab: '110242' };
+  const VENDOR_NO_DIL_FRONTEND = 'V.00__ISI_KODE_VENDOR_DIL'; // GANTI sesuai kode vendor DIL di Accurate DKMS
+
+  let supplierTerpilih = null;
+  let bankTerpilih = 'bca';
+  let tipeBayar = 'tempo';
+  let itemCounter = 0;
+  const items = {}; // rowId -> { sku, nama, qty, harga }
+  let debounceSupplier = null;
+
+  const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+  if (tg) { tg.ready(); tg.expand(); }
+  const params = new URLSearchParams(window.location.search);
+  const chatId = params.get('chatId') || (tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '');
+  const namaAdmin = params.get('nama') || ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? [tg.initDataUnsafe.user.first_name, tg.initDataUnsafe.user.last_name].filter(Boolean).join(' ') : 'Admin');
+
+  document.getElementById('tanggal').valueAsDate = new Date();
+  document.getElementById('tanggalBayar').valueAsDate = new Date();
+  tambahItemRow();
+
+  function formatRp(n) { return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
+
+  // ---------- Supplier search ----------
+  document.getElementById('supplierSearch').addEventListener('input', function (e) {
+    const q = e.target.value.trim();
+    clearTimeout(debounceSupplier);
+    if (q.length < 2) { document.getElementById('supplierHasil').innerHTML = ''; return; }
+    debounceSupplier = setTimeout(function () { cariSupplier(q); }, 350);
+  });
+
+  async function cariSupplier(query) {
+    const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'cari_supplier_nota_app', query }) });
+    const json = await resp.json();
+    const el = document.getElementById('supplierHasil');
+    if (!json.success || !json.hasil.length) { el.innerHTML = '<div class="hasil-item">Nggak ketemu.</div>'; return; }
+    el.innerHTML = '';
+    json.hasil.forEach(function (s) {
+      const d = document.createElement('div');
+      d.className = 'hasil-item';
+      d.innerHTML = s.namaSupplier + '<div class="kode">' + s.kodeVendor + '</div>';
+      d.onclick = function () { pilihSupplier(s); };
+      el.appendChild(d);
+    });
+  }
+
+  function pilihSupplier(s) {
+    supplierTerpilih = s;
+    document.getElementById('supplierHasil').innerHTML = '';
+    document.getElementById('supplierSearch').style.display = 'none';
+    document.getElementById('supplierChip').innerHTML = '<div class="chip">' + s.namaSupplier + ' <span class="x" onclick="gantiSupplier()">✕</span></div>';
+    document.getElementById('dilWarning').style.display = (s.kodeVendor === VENDOR_NO_DIL_FRONTEND) ? 'block' : 'none';
+  }
+  function gantiSupplier() {
+    supplierTerpilih = null;
+    document.getElementById('supplierSearch').style.display = 'block';
+    document.getElementById('supplierSearch').value = '';
+    document.getElementById('supplierChip').innerHTML = '';
+    document.getElementById('dilWarning').style.display = 'none';
+  }
+
+  // ---------- Item rows ----------
+  function tambahItemRow() {
+    itemCounter++;
+    const id = 'item' + itemCounter;
+    items[id] = { sku: null, nama: null, qty: 1, harga: 0 };
+    const div = document.createElement('div');
+    div.className = 'item-row';
+    div.id = 'row-' + id;
+    div.innerHTML =
+      '<span class="hapus-item" onclick="hapusItemRow(\\'' + id + '\\')">✕ Hapus</span>' +
+      '<div class="search-wrap">' +
+        '<input type="text" placeholder="Cari nama barang..." oninput="cariItemDebounced(\\'' + id + '\\', this.value)">' +
+        '<div class="hasil-list" id="hasil-' + id + '"></div>' +
+        '<div id="chip-' + id + '"></div>' +
+      '</div>' +
+      '<div class="row-inputs" style="margin-top:8px;">' +
+        '<div><label style="margin-top:0;">Qty</label><input type="number" value="1" oninput="updateItemQty(\\'' + id + '\\', this.value)"></div>' +
+        '<div><label style="margin-top:0;">Harga satuan</label><input type="number" oninput="updateItemHarga(\\'' + id + '\\', this.value)"></div>' +
+      '</div>';
+    document.getElementById('itemRows').appendChild(div);
+  }
+
+  function hapusItemRow(id) {
+    delete items[id];
+    document.getElementById('row-' + id).remove();
+    hitungTotal();
+  }
+
+  const debounceItemTimers = {};
+  function cariItemDebounced(id, q) {
+    clearTimeout(debounceItemTimers[id]);
+    q = q.trim();
+    if (q.length < 2) { document.getElementById('hasil-' + id).innerHTML = ''; return; }
+    debounceItemTimers[id] = setTimeout(function () { cariItemBarang(id, q); }, 350);
+  }
+
+  async function cariItemBarang(id, query) {
+    const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'cari_item_faktur_app', query }) });
+    const json = await resp.json();
+    const el = document.getElementById('hasil-' + id);
+    if (!json.success || !json.hasil.length) { el.innerHTML = '<div class="hasil-item">Nggak ketemu.</div>'; return; }
+    el.innerHTML = '';
+    json.hasil.forEach(function (it) {
+      const d = document.createElement('div');
+      d.className = 'hasil-item';
+      d.innerHTML = it.nama + '<div class="kode">' + it.sku + '</div>';
+      d.onclick = function () { pilihItemBarang(id, it); };
+      el.appendChild(d);
+    });
+  }
+
+  function pilihItemBarang(id, it) {
+    items[id].sku = it.sku;
+    items[id].nama = it.nama;
+    document.getElementById('hasil-' + id).innerHTML = '';
+    document.querySelector('#row-' + id + ' input[type=text]').style.display = 'none';
+    document.getElementById('chip-' + id).innerHTML = '<div class="chip">' + it.nama + '</div>';
+    hitungTotal();
+  }
+
+  function updateItemQty(id, v) { items[id].qty = parseFloat(v) || 0; hitungTotal(); }
+  function updateItemHarga(id, v) { items[id].harga = parseFloat(v) || 0; hitungTotal(); }
+
+  function hitungTotal() {
+    let total = 0;
+    Object.values(items).forEach(function (it) { total += (it.qty || 0) * (it.harga || 0); });
+    document.getElementById('totalDisplay').textContent = formatRp(total);
+    if (tipeBayar === 'cash' && !document.getElementById('nominalBayar').dataset.touched) {
+      document.getElementById('nominalBayar').value = total;
+    }
+  }
+  document.getElementById('nominalBayar').addEventListener('input', function () { this.dataset.touched = '1'; });
+
+  // ---------- Pembayaran toggle ----------
+  function pilihTipeBayar(t) {
+    tipeBayar = t;
+    document.getElementById('toggle-tempo').classList.toggle('selected', t === 'tempo');
+    document.getElementById('toggle-cash').classList.toggle('selected', t === 'cash');
+    document.getElementById('pembayaranDetail').classList.toggle('active', t === 'cash');
+    if (t === 'cash') hitungTotal();
+  }
+  function pilihBank(b) {
+    bankTerpilih = b;
+    document.getElementById('bank-bca').classList.toggle('selected', b === 'bca');
+    document.getElementById('bank-lkab').classList.toggle('selected', b === 'lkab');
+  }
+
+  // ---------- File to base64 ----------
+  function fileToBase64(file) {
+    return new Promise(function (resolve, reject) {
+      if (!file) return resolve(null);
+      const reader = new FileReader();
+      reader.onload = function () { resolve({ base64: reader.result.split(',')[1], mimeType: file.type }); };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // ---------- Submit ----------
+  async function submitNota() {
+    if (!supplierTerpilih) return tampilkanHasil(false, 'Supplier belum dipilih.');
+    const tanggal = document.getElementById('tanggal').value;
+    if (!tanggal) return tampilkanHasil(false, 'Tanggal belum diisi.');
+    const itemList = Object.values(items).filter(function (it) { return it.sku && it.qty > 0; });
+    if (!itemList.length) return tampilkanHasil(false, 'Belum ada barang yang lengkap diisi.');
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+    try {
+      const fotoNotaFile = document.getElementById('fotoNota').files[0];
+      const fotoBuktiFile = document.getElementById('fotoBukti').files[0];
+      const fotoNota = await fileToBase64(fotoNotaFile);
+      const fotoBukti = tipeBayar === 'cash' ? await fileToBase64(fotoBuktiFile) : null;
+
+      const payload = {
+        action: 'proses_nota_lengkap_app',
+        vendorNo: supplierTerpilih.kodeVendor,
+        namaSupplier: supplierTerpilih.namaSupplier,
+        tanggal: tanggal,
+        nomorNota: document.getElementById('nomorNota').value || null,
+        items: itemList.map(function (it) { return { namaBarang: it.sku, qty: it.qty, hargaSatuan: it.harga }; }),
+        dicatatOleh: namaAdmin,
+        chatId: chatId
+      };
+      if (fotoNota) { payload.base64ImageNota = fotoNota.base64; payload.mimeTypeNota = fotoNota.mimeType; }
+      if (tipeBayar === 'cash') {
+        payload.nominalBayar = parseFloat(document.getElementById('nominalBayar').value) || 0;
+        payload.kodeAkunBankBayar = BANK[bankTerpilih];
+        payload.tanggalBayar = document.getElementById('tanggalBayar').value || tanggal;
+        if (fotoBukti) { payload.base64ImageBukti = fotoBukti.base64; payload.mimeTypeBukti = fotoBukti.mimeType; }
+      }
+
+      const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
+      const json = await resp.json();
+
+      if (json.success) {
+        let msg = '✅ Nota tersimpan!<br>No. Faktur: ' + json.accurateNumber + '<br>Total: ' + formatRp(json.totalNilai) + '<br><br>';
+        msg += 'Status bayar: ' + json.pembayaran.status;
+        if (json.pembayaran.nominal) msg += ' (' + formatRp(json.pembayaran.nominal) + ')';
+        if (json.pembayaran.noPembayaran) msg += '<br>No. Pembayaran: ' + json.pembayaran.noPembayaran;
+        if (json.pembayaran.error) msg += '<br>⚠️ ' + json.pembayaran.error;
+        if (json.pembayaran.catatan) msg += '<br>ℹ️ ' + json.pembayaran.catatan;
+        tampilkanHasil(true, msg);
+        if (tg) tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success');
+      } else {
+        tampilkanHasil(false, json.error || 'Gagal simpan nota.');
+      }
+    } catch (err) {
+      tampilkanHasil(false, 'Gagal terhubung ke server: ' + err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Simpan Nota';
+    }
+  }
+
+  function tampilkanHasil(sukses, html) {
+    const el = document.getElementById('result');
+    el.className = 'result ' + (sukses ? 'success' : 'error');
+    el.innerHTML = html;
+  }
+</script>
+</body>
+</html>
