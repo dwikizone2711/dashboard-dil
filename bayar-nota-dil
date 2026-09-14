@@ -94,9 +94,13 @@
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({
-          action: 'bayar_nota_dil_fifo_app',
-          data: { tanggal, nominal, kodeAkunBank: BANK[bankTerpilih], dicatatOleh: namaAdmin, chatId }
-        })
+         action: 'bayar_nota_dil_fifo_app',
+         tanggal: tanggal,
+         nominal: nominal,
+         kodeAkunBank: BANK[bankTerpilih],
+         dicatatOleh: namaAdmin,
+         chatId: chatId
+       })
       });
       const json = await resp.json();
       if (json.success) {
