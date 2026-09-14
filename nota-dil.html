@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Nota DIL - DKMS</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a1a; padding: 16px; padding-bottom: 40px; }
+  h1 { font-size: 20px; margin-bottom: 4px; color: #1a3a5c; }
+  .subtitle { font-size: 13px; color: #666; margin-bottom: 16px; }
+  .card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 14px; color: #1a3a5c; margin-bottom: 12px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #333; margin-bottom: 6px; margin-top: 12px; }
+  label:first-child { margin-top: 0; }
+  input { width: 100%; padding: 11px; border: 1px solid #d0d0d0; border-radius: 8px; font-size: 15px; }
+  input:focus { outline: none; border-color: #1a3a5c; }
+  .search-wrap { position: relative; }
+  .hasil-list { margin-top: 6px; }
+  .hasil-item { background: #f7f9fb; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; cursor: pointer; font-size: 13px; }
+  .hasil-item:active { background: #eaf1f8; }
+  .hasil-item .kode { font-size: 11px; color: #888; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; background: #eaf1f8; border: 1px solid #1a3a5c; border-radius: 20px; padding: 6px 12px; font-size: 13px; font-weight: 600; margin-top: 6px; }
+  .chip .x { cursor: pointer; color: #c0392b; font-weight: 700; }
+  .item-row { border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; margin-top: 10px; position: relative; }
+  .item-row .row-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .item-row .hapus-item { position: absolute; top: 8px; right: 8px; color: #c0392b; font-size: 12px; cursor: pointer; }
+  .btn-tambah { width: 100%; padding: 10px; background: #eaf1f8; color: #1a3a5c; border: 1px dashed #1a3a5c; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+  .total-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: 700; margin-top: 14px; padding-top: 10px; border-top: 1px solid #ddd; }
+  input[type=file] { padding: 8px; font-size: 13px; }
+  button.submit-btn { width: 100%; margin-top: 6px; padding: 14px; background: #1a3a5c; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  button.submit-btn:disabled { background: #a0a0a0; }
+  .result { display: none; margin-top: 16px; padding: 14px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
+  .result.success { display: block; background: #e6f7ec; color: #1e7e34; }
+  .result.error { display: block; background: #fdecea; color: #c0392b; }
+</style>
+</head>
+<body>
+
+  <h1>✍️ Nota DIL</h1>
+  <div class="subtitle">Pembelian harian dari CV Dwikarya Inti Logam</div>
+
+  <div class="card">
+    <label>Tanggal</label>
+    <input type="date" id="tanggal">
+
+    <label>No. Nota (opsional)</label>
+    <input type="text" id="nomorNota" placeholder="Kosongin kalau nggak ada">
+
+    <label>Foto Nota (opsional)</label>
+    <input type="file" id="fotoNota" accept="image/*" capture="environment">
+  </div>
+
+  <div class="card">
+    <h2>Barang</h2>
+    <div id="itemRows"></div>
+    <button class="btn-tambah" onclick="tambahItemRow()">+ Tambah Barang</button>
+    <div class="total-row"><span>Total</span><span id="totalDisplay">Rp 0</span></div>
+  </div>
+
+  <button class="submit-btn" id="submitBtn" onclick="submitNota()">Simpan Nota DIL</button>
+
+  <div class="result" id="result"></div>
+
+<script>
+  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
+
+  let itemCounter = 0;
+  const items = {};
+  const debounceItemTimers = {};
+
+  const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+  if (tg) { tg.ready(); tg.expand(); }
+  const params = new URLSearchParams(window.location.search);
+  const chatId = params.get('chatId') || (tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '');
+  const namaAdmin = params.get('nama') || ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? [tg.initDataUnsafe.user.first_name, tg.initDataUnsafe.user.last_name].filter(Boolean).join(' ') : 'Admin');
+
+  document.getElementById('tanggal').valueAsDate = new Date();
+  tambahItemRow();
+
+  function formatRp(n) { return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
+
+  function tambahItemRow() {
+    itemCounter++;
+    const id = 'item' + itemCounter;
+    items[id] = { sku: null, nama: null, qty: 1, harga: 0 };
+    const div = document.createElement('div');
+    div.className = 'item-row';
+    div.id = 'row-' + id;
+    div.innerHTML =
+      '<span class="hapus-item" onclick="hapusItemRow(\\'' + id + '\\')">✕ Hapus</span>' +
+      '<div class="search-wrap">' +
+        '<input type="text" placeholder="Cari nama barang..." oninput="cariItemDebounced(\\'' + id + '\\', this.value)">' +
+        '<div class="hasil-list" id="hasil-' + id + '"></div>' +
+        '<div id="chip-' + id + '"></div>' +
+      '</div>' +
+      '<div class="row-inputs" style="margin-top:8px;">' +
+        '<div><label style="margin-top:0;">Qty</label><input type="number" value="1" oninput="updateItemQty(\\'' + id + '\\', this.value)"></div>' +
+        '<div><label style="margin-top:0;">Harga satuan</label><input type="number" oninput="updateItemHarga(\\'' + id + '\\', this.value)"></div>' +
+      '</div>';
+    document.getElementById('itemRows').appendChild(div);
+  }
+
+  function hapusItemRow(id) { delete items[id]; document.getElementById('row-' + id).remove(); hitungTotal(); }
+
+  function cariItemDebounced(id, q) {
+    clearTimeout(debounceItemTimers[id]);
+    q = q.trim();
+    if (q.length < 2) { document.getElementById('hasil-' + id).innerHTML = ''; return; }
+    debounceItemTimers[id] = setTimeout(function () { cariItemBarang(id, q); }, 350);
+  }
+
+  async function cariItemBarang(id, query) {
+    const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'cari_item_faktur_app', query }) });
+    const json = await resp.json();
+    const el = document.getElementById('hasil-' + id);
+    if (!json.success || !json.hasil.length) { el.innerHTML = '<div class="hasil-item">Nggak ketemu.</div>'; return; }
+    el.innerHTML = '';
+    json.hasil.forEach(function (it) {
+      const d = document.createElement('div');
+      d.className = 'hasil-item';
+      d.innerHTML = it.nama + '<div class="kode">' + it.sku + '</div>';
+      d.onclick = function () { pilihItemBarang(id, it); };
+      el.appendChild(d);
+    });
+  }
+
+  function pilihItemBarang(id, it) {
+    items[id].sku = it.sku; items[id].nama = it.nama;
+    document.getElementById('hasil-' + id).innerHTML = '';
+    document.querySelector('#row-' + id + ' input[type=text]').style.display = 'none';
+    document.getElementById('chip-' + id).innerHTML = '<div class="chip">' + it.nama + '</div>';
+    hitungTotal();
+  }
+
+  function updateItemQty(id, v) { items[id].qty = parseFloat(v) || 0; hitungTotal(); }
+  function updateItemHarga(id, v) { items[id].harga = parseFloat(v) || 0; hitungTotal(); }
+
+  function hitungTotal() {
+    let total = 0;
+    Object.values(items).forEach(function (it) { total += (it.qty || 0) * (it.harga || 0); });
+    document.getElementById('totalDisplay').textContent = formatRp(total);
+  }
+
+  function fileToBase64(file) {
+    return new Promise(function (resolve, reject) {
+      if (!file) return resolve(null);
+      const reader = new FileReader();
+      reader.onload = function () { resolve({ base64: reader.result.split(',')[1], mimeType: file.type }); };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function submitNota() {
+    const tanggal = document.getElementById('tanggal').value;
+    if (!tanggal) return tampilkanHasil(false, 'Tanggal belum diisi.');
+    const itemList = Object.values(items).filter(function (it) { return it.sku && it.qty > 0; });
+    if (!itemList.length) return tampilkanHasil(false, 'Belum ada barang yang lengkap diisi.');
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+    try {
+      const fotoNota = await fileToBase64(document.getElementById('fotoNota').files[0]);
+      const payload = {
+        action: 'proses_nota_dil_app',
+        tanggal: tanggal,
+        nomorNota: document.getElementById('nomorNota').value || null,
+        items: itemList.map(function (it) { return { namaBarang: it.sku, qty: it.qty, hargaSatuan: it.harga }; }),
+        dicatatOleh: namaAdmin,
+        chatId: chatId
+      };
+      if (fotoNota) { payload.base64ImageNota = fotoNota.base64; payload.mimeTypeNota = fotoNota.mimeType; }
+
+      const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
+      const json = await resp.json();
+
+      if (json.success) {
+        let msg = '✅ Nota DIL tersimpan!<br>No. Faktur Pembelian (DKMS): ' + json.accurateNumberPI + '<br>Total: ' + formatRp(json.totalNilai) + '<br><br>';
+        msg += 'Faktur Penjualan (DIL): ' + json.statusSIdil;
+        if (json.warningSIdil) msg += '<br>⚠️ ' + json.warningSIdil;
+        tampilkanHasil(true, msg);
+        if (tg) tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success');
+      } else {
+        tampilkanHasil(false, json.error || 'Gagal simpan nota.');
+      }
+    } catch (err) {
+      tampilkanHasil(false, 'Gagal terhubung ke server: ' + err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Simpan Nota DIL';
+    }
+  }
+
+  function tampilkanHasil(sukses, html) {
+    const el = document.getElementById('result');
+    el.className = 'result ' + (sukses ? 'success' : 'error');
+    el.innerHTML = html;
+  }
+</script>
+</body>
+</html>
