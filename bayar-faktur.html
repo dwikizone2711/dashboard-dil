@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Bayar Faktur - DKMS</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a1a; padding: 16px; padding-bottom: 40px; }
+  h1 { font-size: 20px; margin-bottom: 4px; color: #1a3a5c; }
+  .subtitle { font-size: 13px; color: #666; margin-bottom: 20px; }
+  .search-box { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  input.search { width: 100%; padding: 12px; border: 1px solid #d0d0d0; border-radius: 8px; font-size: 16px; }
+  input.search:focus { outline: none; border-color: #1a3a5c; }
+  .hasil-list { margin-top: 10px; }
+  .hasil-item { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; }
+  .hasil-item:active { background: #eaf1f8; }
+  .hasil-item .nama { font-weight: 600; font-size: 14px; }
+  .hasil-item .kode { font-size: 11px; color: #888; margin-top: 2px; }
+  .loading-text, .empty-text { font-size: 13px; color: #888; padding: 8px 4px; }
+  .selected-supplier { background: #eaf1f8; border: 2px solid #1a3a5c; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .selected-supplier .nama { font-weight: 600; font-size: 14px; }
+  .ganti-btn { font-size: 12px; color: #1a3a5c; text-decoration: underline; background: none; border: none; cursor: pointer; }
+  .bank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .bank-card { background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 14px 10px; text-align: center; cursor: pointer; }
+  .bank-card.selected { border-color: #1a3a5c; background: #eaf1f8; }
+  .bank-card .name { font-weight: 600; font-size: 14px; }
+  .bank-card .no { font-size: 11px; color: #666; margin-top: 4px; }
+  .form-section { display: none; background: #fff; border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .form-section.active { display: block; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #333; margin-bottom: 6px; margin-top: 14px; }
+  label:first-child { margin-top: 0; }
+  input { width: 100%; padding: 12px; border: 1px solid #d0d0d0; border-radius: 8px; font-size: 16px; }
+  input:focus { outline: none; border-color: #1a3a5c; }
+  button.submit-btn { width: 100%; margin-top: 18px; padding: 14px; background: #1a3a5c; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  button.submit-btn:disabled { background: #a0a0a0; }
+  .result { display: none; margin-top: 16px; padding: 14px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
+  .result.success { display: block; background: #e6f7ec; color: #1e7e34; }
+  .result.error { display: block; background: #fdecea; color: #c0392b; }
+</style>
+</head>
+<body>
+
+  <h1>💳 Bayar Faktur (FIFO)</h1>
+  <div class="subtitle">CV Dwi Karya Makmur Sejahtera</div>
+
+  <div id="searchSection">
+    <div class="search-box">
+      <input type="text" class="search" id="searchInput" placeholder="Ketik nama supplier..." autocomplete="off">
+    </div>
+    <div class="hasil-list" id="hasilList"></div>
+  </div>
+
+  <div id="selectedSection" style="display:none;">
+    <div class="selected-supplier">
+      <span class="nama" id="namaSupplierTerpilih"></span>
+      <button class="ganti-btn" onclick="gantiSupplier()">Ganti</button>
+    </div>
+
+    <div class="bank-grid">
+      <div class="bank-card selected" id="bank-bca" onclick="pilihBank('bca')">
+        <div class="name">🏦 BCA DKMS</div>
+        <div class="no">7285649676</div>
+      </div>
+      <div class="bank-card" id="bank-lkab" onclick="pilihBank('lkab')">
+        <div class="name">🏧 LKAB Mandiri</div>
+        <div class="no">1370026099925</div>
+      </div>
+    </div>
+
+    <div class="form-section active">
+      <label for="tanggal">Tanggal Bayar</label>
+      <input type="date" id="tanggal">
+
+      <label for="nominal">Total Dibayar (Rp)</label>
+      <input type="number" id="nominal" inputmode="numeric">
+
+      <button class="submit-btn" id="submitBtn" onclick="submitBayar()">Catat & Push ke Accurate (FIFO)</button>
+    </div>
+  </div>
+
+  <div class="result" id="result"></div>
+
+<script>
+  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
+  const BANK = { bca: '110105', lkab: '110242' };
+
+  let bankTerpilih = 'bca';
+  let supplierTerpilih = null; // { namaSupplier, kodeVendor }
+  let debounceTimer = null;
+
+  const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+  if (tg) { tg.ready(); tg.expand(); }
+
+  const params = new URLSearchParams(window.location.search);
+  const chatId = params.get('chatId') || (tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '');
+  const namaAdmin = params.get('nama') || ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? [tg.initDataUnsafe.user.first_name, tg.initDataUnsafe.user.last_name].filter(Boolean).join(' ') : 'Admin');
+
+  document.getElementById('tanggal').valueAsDate = new Date();
+
+  function formatRp(n) { return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
+
+  document.getElementById('searchInput').addEventListener('input', function (e) {
+    const query = e.target.value.trim();
+    clearTimeout(debounceTimer);
+    if (query.length < 2) {
+      document.getElementById('hasilList').innerHTML = '';
+      return;
+    }
+    document.getElementById('hasilList').innerHTML = '<div class="loading-text">Mencari...</div>';
+    debounceTimer = setTimeout(function () { cariSupplier(query); }, 350);
+  });
+
+  async function cariSupplier(query) {
+    try {
+      const resp = await fetch(WEB_APP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'cari_supplier_faktur_app', query: query })
+      });
+      const json = await resp.json();
+      const list = document.getElementById('hasilList');
+      if (!json.success || !json.hasil || json.hasil.length === 0) {
+        list.innerHTML = '<div class="empty-text">Nggak ketemu supplier dengan nama itu.</div>';
+        return;
+      }
+      list.innerHTML = '';
+      json.hasil.forEach(function (s) {
+        const div = document.createElement('div');
+        div.className = 'hasil-item';
+        div.innerHTML = '<div class="nama">' + s.namaSupplier + '</div><div class="kode">' + s.kodeVendor + '</div>';
+        div.onclick = function () { pilihSupplier(s); };
+        list.appendChild(div);
+      });
+    } catch (err) {
+      document.getElementById('hasilList').innerHTML = '<div class="empty-text">Gagal cari: ' + err.message + '</div>';
+    }
+  }
+
+  function pilihSupplier(s) {
+    supplierTerpilih = s;
+    document.getElementById('namaSupplierTerpilih').textContent = s.namaSupplier;
+    document.getElementById('searchSection').style.display = 'none';
+    document.getElementById('selectedSection').style.display = 'block';
+  }
+
+  function gantiSupplier() {
+    supplierTerpilih = null;
+    document.getElementById('searchSection').style.display = 'block';
+    document.getElementById('selectedSection').style.display = 'none';
+    document.getElementById('searchInput').value = '';
+    document.getElementById('hasilList').innerHTML = '';
+    document.getElementById('result').className = 'result';
+    document.getElementById('result').innerHTML = '';
+  }
+
+  function pilihBank(b) {
+    bankTerpilih = b;
+    document.getElementById('bank-bca').classList.toggle('selected', b === 'bca');
+    document.getElementById('bank-lkab').classList.toggle('selected', b === 'lkab');
+  }
+
+  async function submitBayar() {
+    if (!supplierTerpilih) return;
+    const nominal = parseFloat(document.getElementById('nominal').value);
+    const tanggal = document.getElementById('tanggal').value;
+    if (!nominal || nominal <= 0) return tampilkanHasil(false, 'Nominal belum valid.');
+    if (!tanggal) return tampilkanHasil(false, 'Tanggal belum diisi.');
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true; btn.textContent = 'Mengirim...';
+
+    try {
+      const resp = await fetch(WEB_APP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          action: 'bayar_faktur_fifo_app',
+          vendorNo: supplierTerpilih.kodeVendor,
+          namaSupplier: supplierTerpilih.namaSupplier,
+          tanggal: tanggal,
+          nominal: nominal,
+          kodeAkunBank: BANK[bankTerpilih],
+          dicatatOleh: namaAdmin,
+          chatId: chatId
+        })
+      });
+      const json = await resp.json();
+      if (json.success) {
+        let msg = '✅ Pembayaran FIFO ke ' + json.namaSupplier + ' berhasil!<br>';
+        msg += 'Nominal terpakai: ' + formatRp(json.nominalTerpakai) + '<br>';
+        if (json.sisaNominal > 0) msg += '⚠️ Sisa tidak terpakai: ' + formatRp(json.sisaNominal) + '<br>';
+        msg += 'No. Pembayaran: ' + json.noPembayaran + '<br><br><b>Faktur dibayar:</b><br>';
+        (json.fakturDibayar || []).forEach(function (f) {
+          msg += f.invoiceNo + ' (' + f.tanggal + '): ' + formatRp(f.dibayar) + (f.lunas ? ' [LUNAS]' : ' [sisa ' + formatRp(f.sisaSesudah) + ']') + '<br>';
+        });
+        tampilkanHasil(true, msg);
+        if (tg) tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success');
+      } else {
+        tampilkanHasil(false, json.error || 'Gagal mencatat pembayaran.');
+      }
+    } catch (err) {
+      tampilkanHasil(false, 'Gagal terhubung ke server: ' + err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Catat & Push ke Accurate (FIFO)';
+    }
+  }
+
+  function tampilkanHasil(sukses, html) {
+    const el = document.getElementById('result');
+    el.className = 'result ' + (sukses ? 'success' : 'error');
+    el.innerHTML = html;
+  }
+</script>
+</body>
+</html>
