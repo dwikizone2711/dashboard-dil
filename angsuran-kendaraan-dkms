@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Angsuran Kendaraan - DKMS</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a1a; padding: 16px; padding-bottom: 40px; }
+  h1 { font-size: 20px; margin-bottom: 4px; color: #1a3a5c; }
+  .subtitle { font-size: 13px; color: #666; margin-bottom: 20px; }
+  .vehicle-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .vehicle-card { background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 14px 6px; text-align: center; cursor: pointer; }
+  .vehicle-card.selected { border-color: #1a3a5c; background: #eaf1f8; }
+  .vehicle-card .icon { font-size: 26px; margin-bottom: 6px; }
+  .vehicle-card .name { font-weight: 600; font-size: 13px; }
+  .vehicle-card .normal-amount { font-size: 10px; color: #666; margin-top: 4px; }
+  .bank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .bank-card { background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 14px 10px; text-align: center; cursor: pointer; }
+  .bank-card.selected { border-color: #1a3a5c; background: #eaf1f8; }
+  .bank-card .name { font-weight: 600; font-size: 14px; }
+  .bank-card .no { font-size: 11px; color: #666; margin-top: 4px; }
+  .form-section { display: none; background: #fff; border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .form-section.active { display: block; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #333; margin-bottom: 6px; margin-top: 14px; }
+  label:first-child { margin-top: 0; }
+  input { width: 100%; padding: 12px; border: 1px solid #d0d0d0; border-radius: 8px; font-size: 16px; }
+  input:focus { outline: none; border-color: #1a3a5c; }
+  .breakdown { margin-top: 16px; background: #f7f9fb; border-radius: 8px; padding: 12px 14px; font-size: 13px; }
+  .breakdown-row { display: flex; justify-content: space-between; padding: 4px 0; }
+  .breakdown-row.total { border-top: 1px solid #ddd; margin-top: 4px; padding-top: 8px; font-weight: 700; }
+  .breakdown-row .warn { color: #c0392b; font-weight: 600; }
+  button.submit-btn { width: 100%; margin-top: 18px; padding: 14px; background: #1a3a5c; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  button.submit-btn:disabled { background: #a0a0a0; }
+  .result { display: none; margin-top: 16px; padding: 14px; border-radius: 8px; font-size: 14px; line-height: 1.5; }
+  .result.success { display: block; background: #e6f7ec; color: #1e7e34; }
+  .result.error { display: block; background: #fdecea; color: #c0392b; }
+</style>
+</head>
+<body>
+
+  <h1>🚗 Angsuran Kendaraan</h1>
+  <div class="subtitle">CV Dwi Karya Makmur Sejahtera</div>
+
+  <div class="vehicle-grid">
+    <div class="vehicle-card" id="card-terios" onclick="pilihKendaraan('terios')">
+      <div class="icon">🚙</div>
+      <div class="name">Terios</div>
+      <div class="normal-amount">Rp 7.970.000</div>
+    </div>
+    <div class="vehicle-card" id="card-scoopy" onclick="pilihKendaraan('scoopy')">
+      <div class="icon">🛵</div>
+      <div class="name">Scoopy</div>
+      <div class="normal-amount">Rp 2.399.000</div>
+    </div>
+    <div class="vehicle-card" id="card-stylo" onclick="pilihKendaraan('stylo')">
+      <div class="icon">🛵</div>
+      <div class="name">Stylo</div>
+      <div class="normal-amount">Rp 3.094.998</div>
+    </div>
+  </div>
+
+  <div class="bank-grid">
+    <div class="bank-card selected" id="bank-bca" onclick="pilihBank('bca')">
+      <div class="name">🏦 BCA DKMS</div>
+      <div class="no">7285649676</div>
+    </div>
+    <div class="bank-card" id="bank-lkab" onclick="pilihBank('lkab')">
+      <div class="name">🏧 LKAB Mandiri</div>
+      <div class="no">1370026099925</div>
+    </div>
+  </div>
+
+  <div class="form-section" id="formSection">
+    <label for="tanggal">Tanggal Bayar</label>
+    <input type="date" id="tanggal">
+
+    <label for="nominal">Nominal Dibayar (Rp)</label>
+    <input type="number" id="nominal" inputmode="numeric">
+
+    <div class="breakdown" id="breakdown"></div>
+
+    <button class="submit-btn" id="submitBtn" onclick="submitAngsuran()">Catat & Push ke Accurate</button>
+  </div>
+
+  <div class="result" id="result"></div>
+
+<script>
+  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
+
+  const KONFIG = {
+    terios: { label: 'Terios (Hutang ACC Astra)', nominalNormal: 7970000, action: 'bayar_angsuran_terios_dkms' },
+    scoopy: { label: 'Scoopy (Adira Finance Bantul)', nominalNormal: 2399000, action: 'bayar_angsuran_scoopy_dkms' },
+    stylo:  { label: 'Stylo (PT. Bekasi Motor)', nominalNormal: 3094998, action: 'bayar_angsuran_stylo_dkms' }
+  };
+  const BANK = { bca: '110105', lkab: '110242' };
+
+  let kendaraanTerpilih = null;
+  let bankTerpilih = 'bca';
+
+  const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+  if (tg) { tg.ready(); tg.expand(); }
+
+  const params = new URLSearchParams(window.location.search);
+  const chatId = params.get('chatId') || (tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '');
+  const namaAdmin = params.get('nama') || ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? [tg.initDataUnsafe.user.first_name, tg.initDataUnsafe.user.last_name].filter(Boolean).join(' ') : 'Admin');
+
+  document.getElementById('tanggal').valueAsDate = new Date();
+
+  function formatRp(n) { return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
+
+  function pilihKendaraan(jenis) {
+    kendaraanTerpilih = jenis;
+    ['terios','scoopy','stylo'].forEach(function(k){ document.getElementById('card-' + k).classList.toggle('selected', k === jenis); });
+    document.getElementById('nominal').value = KONFIG[jenis].nominalNormal;
+    document.getElementById('formSection').classList.add('active');
+    document.getElementById('result').className = 'result';
+    document.getElementById('result').innerHTML = '';
+    hitungBreakdown();
+  }
+
+  function pilihBank(b) {
+    bankTerpilih = b;
+    document.getElementById('bank-bca').classList.toggle('selected', b === 'bca');
+    document.getElementById('bank-lkab').classList.toggle('selected', b === 'lkab');
+  }
+
+  function hitungBreakdown() {
+    if (!kendaraanTerpilih) return;
+    const normal = KONFIG[kendaraanTerpilih].nominalNormal;
+    const dibayar = parseFloat(document.getElementById('nominal').value) || 0;
+    const pokok = Math.min(dibayar, normal);
+    const bunga = Math.max(0, dibayar - normal);
+    let html = '';
+    html += '<div class="breakdown-row"><span>Pokok angsuran</span><span>' + formatRp(pokok) + '</span></div>';
+    if (bunga > 0) html += '<div class="breakdown-row"><span class="warn">Bunga/denda keterlambatan</span><span class="warn">' + formatRp(bunga) + '</span></div>';
+    html += '<div class="breakdown-row total"><span>Total dibayar</span><span>' + formatRp(dibayar) + '</span></div>';
+    document.getElementById('breakdown').innerHTML = html;
+  }
+
+  document.getElementById('nominal').addEventListener('input', hitungBreakdown);
+
+  async function submitAngsuran() {
+    if (!kendaraanTerpilih) return;
+    const nominal = parseFloat(document.getElementById('nominal').value);
+    const tanggal = document.getElementById('tanggal').value;
+    if (!nominal || nominal <= 0) return tampilkanHasil(false, 'Nominal belum valid.');
+    if (!tanggal) return tampilkanHasil(false, 'Tanggal belum diisi.');
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true; btn.textContent = 'Mengirim...';
+
+    try {
+      const resp = await fetch(WEB_APP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          action: KONFIG[kendaraanTerpilih].action,
+          data: { tanggal, nominal, kodeAkunBank: BANK[bankTerpilih], dicatatOleh: namaAdmin, chatId }
+        })
+      });
+      const json = await resp.json();
+      if (json.success) {
+        let msg = '✅ Angsuran ' + json.kendaraan + ' berhasil dicatat!<br>';
+        msg += 'Pokok: ' + formatRp(json.pokok) + '<br>';
+        if (json.bunga > 0) msg += 'Bunga/denda: ' + formatRp(json.bunga) + '<br>';
+        msg += 'No. Accurate: ' + (json.accurateNumber || '-');
+        tampilkanHasil(true, msg);
+        if (tg) tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success');
+      } else {
+        tampilkanHasil(false, json.error || 'Gagal mencatat angsuran.');
+      }
+    } catch (err) {
+      tampilkanHasil(false, 'Gagal terhubung ke server: ' + err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Catat & Push ke Accurate';
+    }
+  }
+
+  function tampilkanHasil(sukses, html) {
+    const el = document.getElementById('result');
+    el.className = 'result ' + (sukses ? 'success' : 'error');
+    el.innerHTML = html;
+  }
+</script>
+</body>
+</html>
