@@ -20,9 +20,8 @@
   .hasil-list { margin-top: 6px; }
   .hasil-item { background: #f7f9fb; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; cursor: pointer; font-size: 13px; }
   .hasil-item:active { background: #eaf1f8; }
-  .hasil-item .kode { font-size: 11px; color: #888; }
+  .hasil-item .kode { font-size: 11px; color: #888; margin-top: 2px; }
   .chip { display: inline-flex; align-items: center; gap: 8px; background: #eaf1f8; border: 1px solid #1a3a5c; border-radius: 20px; padding: 6px 12px; font-size: 13px; font-weight: 600; margin-top: 6px; }
-  .chip .x { cursor: pointer; color: #c0392b; font-weight: 700; }
   .item-row { border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; margin-top: 10px; position: relative; }
   .item-row .row-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .item-row .hapus-item { position: absolute; top: 8px; right: 8px; color: #c0392b; font-size: 12px; cursor: pointer; }
@@ -67,6 +66,7 @@
   const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
 
   let itemCounter = 0;
+  // id -> { skuDil, satuanDil, skuDkms, namaDkms, qtyPerSatuan, qtyDil, hargaSatuanDil }
   const items = {};
   const debounceItemTimers = {};
 
@@ -81,28 +81,33 @@
 
   function formatRp(n) { return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
 
+  // ---------- Item rows ----------
   function tambahItemRow() {
     itemCounter++;
     const id = 'item' + itemCounter;
-    items[id] = { sku: null, nama: null, qty: 1, harga: 0 };
+    items[id] = { skuDil: null, satuanDil: null, skuDkms: null, namaDkms: null, qtyPerSatuan: 1, qtyDil: 1, hargaSatuanDil: 0 };
     const div = document.createElement('div');
     div.className = 'item-row';
     div.id = 'row-' + id;
     div.innerHTML =
-      '<span class="hapus-item" onclick="hapusItemRow(\\'' + id + '\\')">✕ Hapus</span>' +
+      '<span class="hapus-item" onclick="hapusItemRow(\'' + id + '\')">✕ Hapus</span>' +
       '<div class="search-wrap">' +
-        '<input type="text" placeholder="Cari nama barang..." oninput="cariItemDebounced(\\'' + id + '\\', this.value)">' +
+        '<input type="text" placeholder="Cari nama barang DIL..." oninput="cariItemDebounced(\'' + id + '\', this.value)">' +
         '<div class="hasil-list" id="hasil-' + id + '"></div>' +
         '<div id="chip-' + id + '"></div>' +
       '</div>' +
       '<div class="row-inputs" style="margin-top:8px;">' +
-        '<div><label style="margin-top:0;">Qty</label><input type="number" value="1" oninput="updateItemQty(\\'' + id + '\\', this.value)"></div>' +
-        '<div><label style="margin-top:0;">Harga satuan</label><input type="number" oninput="updateItemHarga(\\'' + id + '\\', this.value)"></div>' +
+        '<div><label id="labelQty-' + id + '" style="margin-top:0;">Jumlah</label><input type="number" value="1" oninput="updateItemQty(\'' + id + '\', this.value)"></div>' +
+        '<div><label id="labelHarga-' + id + '" style="margin-top:0;">Harga satuan</label><input type="number" oninput="updateItemHarga(\'' + id + '\', this.value)"></div>' +
       '</div>';
     document.getElementById('itemRows').appendChild(div);
   }
 
-  function hapusItemRow(id) { delete items[id]; document.getElementById('row-' + id).remove(); hitungTotal(); }
+  function hapusItemRow(id) {
+    delete items[id];
+    document.getElementById('row-' + id).remove();
+    hitungTotal();
+  }
 
   function cariItemDebounced(id, q) {
     clearTimeout(debounceItemTimers[id]);
@@ -112,37 +117,52 @@
   }
 
   async function cariItemBarang(id, query) {
-    const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'cari_item_faktur_app', query }) });
+    const resp = await fetch(WEB_APP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'cari_item_dil_app', query: query })
+    });
     const json = await resp.json();
     const el = document.getElementById('hasil-' + id);
-    if (!json.success || !json.hasil.length) { el.innerHTML = '<div class="hasil-item">Nggak ketemu.</div>'; return; }
+    if (!json.success || !json.hasil.length) {
+      el.innerHTML = '<div class="hasil-item">Nggak ketemu. Cek/tambah dulu di tab "Konversi Item DIL".</div>';
+      return;
+    }
     el.innerHTML = '';
     json.hasil.forEach(function (it) {
       const d = document.createElement('div');
       d.className = 'hasil-item';
-      d.innerHTML = it.nama + '<div class="kode">' + it.sku + '</div>';
+      d.innerHTML = it.skuDil + ' \u2192 ' + it.namaDkms +
+        '<div class="kode">satuan: ' + it.satuanDil + ' (1 ' + it.satuanDil + ' = ' + it.qtyPerSatuan + ' ' + it.skuDkms + ')</div>';
       d.onclick = function () { pilihItemBarang(id, it); };
       el.appendChild(d);
     });
   }
 
   function pilihItemBarang(id, it) {
-    items[id].sku = it.sku; items[id].nama = it.nama;
+    items[id].skuDil = it.skuDil;
+    items[id].satuanDil = it.satuanDil;
+    items[id].skuDkms = it.skuDkms;
+    items[id].namaDkms = it.namaDkms;
+    items[id].qtyPerSatuan = it.qtyPerSatuan;
     document.getElementById('hasil-' + id).innerHTML = '';
     document.querySelector('#row-' + id + ' input[type=text]').style.display = 'none';
-    document.getElementById('chip-' + id).innerHTML = '<div class="chip">' + it.nama + '</div>';
+    document.getElementById('chip-' + id).innerHTML = '<div class="chip">' + it.skuDil + ' (' + it.satuanDil + ') \u2192 ' + it.namaDkms + '</div>';
+    document.getElementById('labelQty-' + id).textContent = 'Jumlah (' + it.satuanDil + ')';
+    document.getElementById('labelHarga-' + id).textContent = 'Harga per ' + it.satuanDil;
     hitungTotal();
   }
 
-  function updateItemQty(id, v) { items[id].qty = parseFloat(v) || 0; hitungTotal(); }
-  function updateItemHarga(id, v) { items[id].harga = parseFloat(v) || 0; hitungTotal(); }
+  function updateItemQty(id, v) { items[id].qtyDil = parseFloat(v) || 0; hitungTotal(); }
+  function updateItemHarga(id, v) { items[id].hargaSatuanDil = parseFloat(v) || 0; hitungTotal(); }
 
   function hitungTotal() {
     let total = 0;
-    Object.values(items).forEach(function (it) { total += (it.qty || 0) * (it.harga || 0); });
+    Object.values(items).forEach(function (it) { total += (it.qtyDil || 0) * (it.hargaSatuanDil || 0); });
     document.getElementById('totalDisplay').textContent = formatRp(total);
   }
 
+  // ---------- File to base64 ----------
   function fileToBase64(file) {
     return new Promise(function (resolve, reject) {
       if (!file) return resolve(null);
@@ -153,10 +173,12 @@
     });
   }
 
+  // ---------- Submit ----------
   async function submitNota() {
     const tanggal = document.getElementById('tanggal').value;
     if (!tanggal) return tampilkanHasil(false, 'Tanggal belum diisi.');
-    const itemList = Object.values(items).filter(function (it) { return it.sku && it.qty > 0; });
+
+    const itemList = Object.values(items).filter(function (it) { return it.skuDil && it.qtyDil > 0; });
     if (!itemList.length) return tampilkanHasil(false, 'Belum ada barang yang lengkap diisi.');
 
     const btn = document.getElementById('submitBtn');
@@ -168,13 +190,19 @@
         action: 'proses_nota_dil_app',
         tanggal: tanggal,
         nomorNota: document.getElementById('nomorNota').value || null,
-        items: itemList.map(function (it) { return { namaBarang: it.sku, qty: it.qty, hargaSatuan: it.harga }; }),
+        items: itemList.map(function (it) {
+          return { skuDkms: it.skuDkms, qtyPerSatuan: it.qtyPerSatuan, qtyDil: it.qtyDil, hargaSatuanDil: it.hargaSatuanDil };
+        }),
         dicatatOleh: namaAdmin,
         chatId: chatId
       };
       if (fotoNota) { payload.base64ImageNota = fotoNota.base64; payload.mimeTypeNota = fotoNota.mimeType; }
 
-      const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
+      const resp = await fetch(WEB_APP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      });
       const json = await resp.json();
 
       if (json.success) {
