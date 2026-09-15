@@ -68,7 +68,7 @@
   let itemCounter = 0;
   // id -> { skuDil, satuanDil, skuDkms, namaDkms, qtyPerSatuan, qtyDil, hargaSatuanDil }
   const items = {};
-  const debounceItemTimers = {};
+  let semuaItemDil = []; // dimuat sekali di awal, difilter lokal (instan, nggak nunggu server)
 
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   if (tg) { tg.ready(); tg.expand(); }
@@ -77,9 +77,25 @@
   const namaAdmin = params.get('nama') || ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? [tg.initDataUnsafe.user.first_name, tg.initDataUnsafe.user.last_name].filter(Boolean).join(' ') : 'Admin');
 
   document.getElementById('tanggal').valueAsDate = new Date();
+  loadDaftarItemDil();
   tambahItemRow();
 
   function formatRp(n) { return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
+
+  // ---------- Load daftar item DIL sekali di awal ----------
+  async function loadDaftarItemDil() {
+    try {
+      const resp = await fetch(WEB_APP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'daftar_item_dil_app' })
+      });
+      const json = await resp.json();
+      if (json.success) semuaItemDil = json.hasil || [];
+    } catch (err) {
+      console.error('Gagal load daftar item DIL:', err);
+    }
+  }
 
   // ---------- Item rows ----------
   function tambahItemRow() {
@@ -92,7 +108,7 @@
     div.innerHTML =
       '<span class="hapus-item" onclick="hapusItemRow(\'' + id + '\')">✕ Hapus</span>' +
       '<div class="search-wrap">' +
-        '<input type="text" placeholder="Cari nama barang DIL..." oninput="cariItemDebounced(\'' + id + '\', this.value)">' +
+        '<input type="text" placeholder="Cari nama barang DIL..." oninput="cariItemLokal(\'' + id + '\', this.value)">' +
         '<div class="hasil-list" id="hasil-' + id + '"></div>' +
         '<div id="chip-' + id + '"></div>' +
       '</div>' +
@@ -109,27 +125,19 @@
     hitungTotal();
   }
 
-  function cariItemDebounced(id, q) {
-    clearTimeout(debounceItemTimers[id]);
-    q = q.trim();
-    if (q.length < 2) { document.getElementById('hasil-' + id).innerHTML = ''; return; }
-    debounceItemTimers[id] = setTimeout(function () { cariItemBarang(id, q); }, 350);
-  }
-
-  async function cariItemBarang(id, query) {
-    const resp = await fetch(WEB_APP_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'cari_item_dil_app', query: query })
-    });
-    const json = await resp.json();
+  function cariItemLokal(id, q) {
+    q = q.trim().toLowerCase();
     const el = document.getElementById('hasil-' + id);
-    if (!json.success || !json.hasil.length) {
+    if (q.length < 1) { el.innerHTML = ''; return; }
+    const hasil = semuaItemDil.filter(function (it) {
+      return it.skuDil.toLowerCase().indexOf(q) !== -1 || (it.namaDkms || '').toLowerCase().indexOf(q) !== -1;
+    });
+    if (!hasil.length) {
       el.innerHTML = '<div class="hasil-item">Nggak ketemu. Cek/tambah dulu di tab "Konversi Item DIL".</div>';
       return;
     }
     el.innerHTML = '';
-    json.hasil.forEach(function (it) {
+    hasil.forEach(function (it) {
       const d = document.createElement('div');
       d.className = 'hasil-item';
       d.innerHTML = it.skuDil + ' \u2192 ' + it.namaDkms +
