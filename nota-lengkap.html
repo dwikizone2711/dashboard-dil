@@ -111,7 +111,6 @@
 <script>
   const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
   const BANK = { bca: '110105', lkab: '110242' };
-  const VENDOR_NO_DIL_FRONTEND = 'V.00__ISI_KODE_VENDOR_DIL'; // GANTI sesuai kode vendor DIL di Accurate DKMS
 
   let supplierTerpilih = null;
   let bankTerpilih = 'bca';
@@ -119,6 +118,7 @@
   let itemCounter = 0;
   const items = {}; // rowId -> { sku, nama, qty, harga }
   let debounceSupplier = null;
+  const debounceItemTimers = {};
 
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   if (tg) { tg.ready(); tg.expand(); }
@@ -141,18 +141,22 @@
   });
 
   async function cariSupplier(query) {
-    const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'cari_supplier_nota_app', query }) });
-    const json = await resp.json();
     const el = document.getElementById('supplierHasil');
-    if (!json.success || !json.hasil.length) { el.innerHTML = '<div class="hasil-item">Nggak ketemu.</div>'; return; }
-    el.innerHTML = '';
-    json.hasil.forEach(function (s) {
-      const d = document.createElement('div');
-      d.className = 'hasil-item';
-      d.innerHTML = s.namaSupplier + '<div class="kode">' + s.kodeVendor + '</div>';
-      d.onclick = function () { pilihSupplier(s); };
-      el.appendChild(d);
-    });
+    try {
+      const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'cari_supplier_nota_app', query }) });
+      const json = await resp.json();
+      if (!json.success || !json.hasil || !json.hasil.length) { el.innerHTML = '<div class="hasil-item">Nggak ketemu.</div>'; return; }
+      el.innerHTML = '';
+      json.hasil.forEach(function (s) {
+        const d = document.createElement('div');
+        d.className = 'hasil-item';
+        d.innerHTML = s.namaSupplier + '<div class="kode">' + s.kodeVendor + '</div>';
+        d.onclick = function () { pilihSupplier(s); };
+        el.appendChild(d);
+      });
+    } catch (err) {
+      el.innerHTML = '<div class="hasil-item">Gagal cari: ' + err.message + '</div>';
+    }
   }
 
   function pilihSupplier(s) {
@@ -160,7 +164,7 @@
     document.getElementById('supplierHasil').innerHTML = '';
     document.getElementById('supplierSearch').style.display = 'none';
     document.getElementById('supplierChip').innerHTML = '<div class="chip">' + s.namaSupplier + ' <span class="x" onclick="gantiSupplier()">✕</span></div>';
-    document.getElementById('dilWarning').style.display = (s.kodeVendor === VENDOR_NO_DIL_FRONTEND) ? 'block' : 'none';
+    document.getElementById('dilWarning').style.display = s.isDIL ? 'block' : 'none';
   }
   function gantiSupplier() {
     supplierTerpilih = null;
@@ -179,15 +183,15 @@
     div.className = 'item-row';
     div.id = 'row-' + id;
     div.innerHTML =
-      '<span class="hapus-item" onclick="hapusItemRow(\\'' + id + '\\')">✕ Hapus</span>' +
+      '<span class="hapus-item" onclick="hapusItemRow(\'' + id + '\')">✕ Hapus</span>' +
       '<div class="search-wrap">' +
-        '<input type="text" placeholder="Cari nama barang..." oninput="cariItemDebounced(\\'' + id + '\\', this.value)">' +
+        '<input type="text" placeholder="Cari nama barang..." oninput="cariItemDebounced(\'' + id + '\', this.value)">' +
         '<div class="hasil-list" id="hasil-' + id + '"></div>' +
         '<div id="chip-' + id + '"></div>' +
       '</div>' +
       '<div class="row-inputs" style="margin-top:8px;">' +
-        '<div><label style="margin-top:0;">Qty</label><input type="number" value="1" oninput="updateItemQty(\\'' + id + '\\', this.value)"></div>' +
-        '<div><label style="margin-top:0;">Harga satuan</label><input type="number" oninput="updateItemHarga(\\'' + id + '\\', this.value)"></div>' +
+        '<div><label style="margin-top:0;">Qty</label><input type="number" value="1" oninput="updateItemQty(\'' + id + '\', this.value)"></div>' +
+        '<div><label style="margin-top:0;">Harga satuan</label><input type="number" oninput="updateItemHarga(\'' + id + '\', this.value)"></div>' +
       '</div>';
     document.getElementById('itemRows').appendChild(div);
   }
@@ -198,7 +202,6 @@
     hitungTotal();
   }
 
-  const debounceItemTimers = {};
   function cariItemDebounced(id, q) {
     clearTimeout(debounceItemTimers[id]);
     q = q.trim();
@@ -207,18 +210,22 @@
   }
 
   async function cariItemBarang(id, query) {
-    const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'cari_item_faktur_app', query }) });
-    const json = await resp.json();
     const el = document.getElementById('hasil-' + id);
-    if (!json.success || !json.hasil.length) { el.innerHTML = '<div class="hasil-item">Nggak ketemu.</div>'; return; }
-    el.innerHTML = '';
-    json.hasil.forEach(function (it) {
-      const d = document.createElement('div');
-      d.className = 'hasil-item';
-      d.innerHTML = it.nama + '<div class="kode">' + it.sku + '</div>';
-      d.onclick = function () { pilihItemBarang(id, it); };
-      el.appendChild(d);
-    });
+    try {
+      const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'cari_item_faktur_app', query }) });
+      const json = await resp.json();
+      if (!json.success || !json.hasil || !json.hasil.length) { el.innerHTML = '<div class="hasil-item">Nggak ketemu.</div>'; return; }
+      el.innerHTML = '';
+      json.hasil.forEach(function (it) {
+        const d = document.createElement('div');
+        d.className = 'hasil-item';
+        d.innerHTML = it.nama + '<div class="kode">' + it.sku + '</div>';
+        d.onclick = function () { pilihItemBarang(id, it); };
+        el.appendChild(d);
+      });
+    } catch (err) {
+      el.innerHTML = '<div class="hasil-item">Gagal cari: ' + err.message + '</div>';
+    }
   }
 
   function pilihItemBarang(id, it) {
