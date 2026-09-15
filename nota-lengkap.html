@@ -140,11 +140,29 @@
     debounceSupplier = setTimeout(function () { cariSupplier(q); }, 350);
   });
 
-  async function cariSupplier(query) {
+  let supplierFetchController = null;
+
+  async function cariSupplier(query, percobaanKe) {
+    percobaanKe = percobaanKe || 1;
     const el = document.getElementById('supplierHasil');
+
+    if (supplierFetchController) supplierFetchController.abort();
+    const controller = new AbortController();
+    supplierFetchController = controller;
+
     try {
-      const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'cari_supplier_nota_app', query }) });
-      const json = await resp.json();
+      const resp = await fetch(WEB_APP_URL, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'cari_supplier_nota_app', query }),
+        signal: controller.signal
+      });
+      const text = await resp.text();
+      let json;
+      try { json = JSON.parse(text); }
+      catch (parseErr) {
+        if (percobaanKe < 2) { return cariSupplier(query, percobaanKe + 1); }
+        throw new Error('Server ngasih balikan aneh (bukan JSON), coba lagi sebentar.');
+      }
       if (!json.success) { el.innerHTML = '<div class="hasil-item">⚠️ Error: ' + (json.error || 'nggak diketahui') + '</div>'; return; }
       if (!json.hasil || !json.hasil.length) { el.innerHTML = '<div class="hasil-item">Nggak ketemu.</div>'; return; }
       el.innerHTML = '';
@@ -156,6 +174,7 @@
         el.appendChild(d);
       });
     } catch (err) {
+      if (err.name === 'AbortError') return;
       el.innerHTML = '<div class="hasil-item">⚠️ Gagal terhubung: ' + err.message + '</div>';
     }
   }
@@ -210,11 +229,29 @@
     debounceItemTimers[id] = setTimeout(function () { cariItemBarang(id, q); }, 350);
   }
 
-  async function cariItemBarang(id, query) {
+  const itemFetchControllers = {};
+
+  async function cariItemBarang(id, query, percobaanKe) {
+    percobaanKe = percobaanKe || 1;
     const el = document.getElementById('hasil-' + id);
+
+    if (itemFetchControllers[id]) itemFetchControllers[id].abort();
+    const controller = new AbortController();
+    itemFetchControllers[id] = controller;
+
     try {
-      const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'cari_item_faktur_app', query }) });
-      const json = await resp.json();
+      const resp = await fetch(WEB_APP_URL, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'cari_item_faktur_app', query }),
+        signal: controller.signal
+      });
+      const text = await resp.text();
+      let json;
+      try { json = JSON.parse(text); }
+      catch (parseErr) {
+        if (percobaanKe < 2) { return cariItemBarang(id, query, percobaanKe + 1); }
+        throw new Error('Server ngasih balikan aneh (bukan JSON), coba lagi sebentar.');
+      }
       if (!json.success) { el.innerHTML = '<div class="hasil-item">⚠️ Error: ' + (json.error || 'nggak diketahui') + '</div>'; return; }
       if (!json.hasil || !json.hasil.length) { el.innerHTML = '<div class="hasil-item">Nggak ketemu.</div>'; return; }
       el.innerHTML = '';
@@ -226,6 +263,7 @@
         el.appendChild(d);
       });
     } catch (err) {
+      if (err.name === 'AbortError') return;
       el.innerHTML = '<div class="hasil-item">⚠️ Gagal terhubung: ' + err.message + '</div>';
     }
   }
