@@ -191,7 +191,11 @@
         tanggal: tanggal,
         nomorNota: document.getElementById('nomorNota').value || null,
         items: itemList.map(function (it) {
-          return { skuDkms: it.skuDkms, qtyPerSatuan: it.qtyPerSatuan, qtyDil: it.qtyDil, hargaSatuanDil: it.hargaSatuanDil };
+          return {
+            skuDil: it.skuDil, satuanDil: it.satuanDil,
+            skuDkms: it.skuDkms, qtyPerSatuan: it.qtyPerSatuan,
+            qtyDil: it.qtyDil, hargaSatuanDil: it.hargaSatuanDil
+          };
         }),
         dicatatOleh: namaAdmin,
         chatId: chatId
