@@ -145,7 +145,8 @@
     try {
       const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'cari_supplier_nota_app', query }) });
       const json = await resp.json();
-      if (!json.success || !json.hasil || !json.hasil.length) { el.innerHTML = '<div class="hasil-item">Nggak ketemu.</div>'; return; }
+      if (!json.success) { el.innerHTML = '<div class="hasil-item">⚠️ Error: ' + (json.error || 'nggak diketahui') + '</div>'; return; }
+      if (!json.hasil || !json.hasil.length) { el.innerHTML = '<div class="hasil-item">Nggak ketemu.</div>'; return; }
       el.innerHTML = '';
       json.hasil.forEach(function (s) {
         const d = document.createElement('div');
@@ -155,7 +156,7 @@
         el.appendChild(d);
       });
     } catch (err) {
-      el.innerHTML = '<div class="hasil-item">Gagal cari: ' + err.message + '</div>';
+      el.innerHTML = '<div class="hasil-item">⚠️ Gagal terhubung: ' + err.message + '</div>';
     }
   }
 
@@ -214,7 +215,8 @@
     try {
       const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'cari_item_faktur_app', query }) });
       const json = await resp.json();
-      if (!json.success || !json.hasil || !json.hasil.length) { el.innerHTML = '<div class="hasil-item">Nggak ketemu.</div>'; return; }
+      if (!json.success) { el.innerHTML = '<div class="hasil-item">⚠️ Error: ' + (json.error || 'nggak diketahui') + '</div>'; return; }
+      if (!json.hasil || !json.hasil.length) { el.innerHTML = '<div class="hasil-item">Nggak ketemu.</div>'; return; }
       el.innerHTML = '';
       json.hasil.forEach(function (it) {
         const d = document.createElement('div');
@@ -224,7 +226,7 @@
         el.appendChild(d);
       });
     } catch (err) {
-      el.innerHTML = '<div class="hasil-item">Gagal cari: ' + err.message + '</div>';
+      el.innerHTML = '<div class="hasil-item">⚠️ Gagal terhubung: ' + err.message + '</div>';
     }
   }
 
