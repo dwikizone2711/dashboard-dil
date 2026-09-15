@@ -16,19 +16,30 @@
   label:first-child { margin-top: 0; }
   input, textarea { width: 100%; padding: 11px; border: 1px solid #d0d0d0; border-radius: 8px; font-size: 15px; }
   input:focus, textarea:focus { outline: none; border-color: #1a3a5c; }
-  .search-wrap { position: relative; }
+  input[type=file] { padding: 8px; font-size: 13px; }
+
+  .item-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .item-card { background: #f7f9fb; border: 2px solid #e0e0e0; border-radius: 12px; padding: 12px 8px; text-align: center; cursor: pointer; }
+  .item-card:active { border-color: #1a3a5c; background: #eaf1f8; }
+  .item-card .nama { font-weight: 600; font-size: 12.5px; line-height: 1.3; }
+  .item-card .kode { font-size: 10.5px; color: #888; margin-top: 4px; }
+  .empty-text { font-size: 13px; color: #888; grid-column: 1 / -1; }
+
+  .search-wrap { position: relative; margin-top: 10px; }
   .hasil-list { margin-top: 6px; }
   .hasil-item { background: #f7f9fb; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; cursor: pointer; font-size: 13px; }
   .hasil-item:active { background: #eaf1f8; }
   .hasil-item .kode { font-size: 11px; color: #888; }
-  .chip { display: inline-flex; align-items: center; gap: 8px; background: #eaf1f8; border: 1px solid #1a3a5c; border-radius: 20px; padding: 6px 12px; font-size: 13px; font-weight: 600; margin-top: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; background: #eaf1f8; border: 1px solid #1a3a5c; border-radius: 20px; padding: 6px 12px; font-size: 13px; font-weight: 600; margin-top: 10px; }
   .chip .x { cursor: pointer; color: #c0392b; font-weight: 700; }
+
   .item-row { border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; margin-top: 10px; position: relative; }
-  .item-row .nama-terpilih { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+  .item-row .nama-terpilih { font-weight: 600; font-size: 13px; margin-bottom: 6px; padding-right: 55px; }
   .item-row .row-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .item-row .hapus-item { position: absolute; top: 8px; right: 8px; color: #c0392b; font-size: 12px; cursor: pointer; }
   .btn-tambah { width: 100%; padding: 10px; background: #eaf1f8; color: #1a3a5c; border: 1px dashed #1a3a5c; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 10px; }
   .total-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: 700; margin-top: 14px; padding-top: 10px; border-top: 1px solid #ddd; }
+
   .toggle-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
   .toggle-btn { padding: 12px; text-align: center; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
   .toggle-btn.selected { border-color: #1a3a5c; background: #eaf1f8; }
@@ -37,7 +48,7 @@
   .bank-card.selected { border-color: #1a3a5c; background: #eaf1f8; }
   #pembayaranDetail { display: none; margin-top: 10px; }
   #pembayaranDetail.active { display: block; }
-  input[type=file] { padding: 8px; font-size: 13px; }
+
   button.submit-btn { width: 100%; margin-top: 6px; padding: 14px; background: #1a3a5c; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
   button.submit-btn:disabled { background: #a0a0a0; }
   .result { display: none; margin-top: 16px; padding: 14px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
@@ -56,11 +67,14 @@
     <input type="date" id="tanggal">
 
     <label>Supplier</label>
-    <div class="search-wrap">
-      <input type="text" id="supplierSearch" placeholder="Ketik nama supplier..." autocomplete="off">
-      <div class="hasil-list" id="supplierHasil"></div>
-      <div id="supplierChip"></div>
+    <div class="item-grid" id="supplierFrequentCards">
+      <div class="empty-text">Memuat...</div>
     </div>
+    <div class="search-wrap">
+      <input type="text" id="supplierSearch" placeholder="Atau cari supplier lain..." autocomplete="off">
+      <div class="hasil-list" id="supplierHasil"></div>
+    </div>
+    <div id="supplierChip"></div>
 
     <label>No. Nota (opsional)</label>
     <input type="text" id="nomorNota" placeholder="Kosongin kalau nggak ada">
@@ -70,9 +84,16 @@
   </div>
 
   <div class="card">
-    <h2>Barang</h2>
+    <h2>Barang sering dibeli — tap buat tambahin</h2>
+    <div class="item-grid" id="itemFrequentCards">
+      <div class="empty-text">Memuat...</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Barang di nota ini</h2>
     <div id="itemRows"></div>
-    <button class="btn-tambah" onclick="tambahItemRow()">+ Tambah Barang</button>
+    <button class="btn-tambah" onclick="tambahItemRowKosong()">+ Cari Barang Lain</button>
     <div class="total-row"><span>Total</span><span id="totalDisplay">Rp 0</span></div>
   </div>
 
@@ -117,8 +138,8 @@
   let tipeBayar = 'tempo';
   let itemCounter = 0;
   const items = {}; // rowId -> { sku, nama, qty, harga }
-  let debounceSupplier = null;
-  const debounceItemTimers = {};
+  const itemFetchControllers = {};
+  let supplierFetchController = null;
 
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   if (tg) { tg.ready(); tg.expand(); }
@@ -128,19 +149,38 @@
 
   document.getElementById('tanggal').valueAsDate = new Date();
   document.getElementById('tanggalBayar').valueAsDate = new Date();
-  tambahItemRow();
+  loadSupplierSering();
+  loadItemSering();
 
   function formatRp(n) { return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
 
-  // ---------- Supplier search ----------
+  // ---------- Supplier sering dibeli (kartu) ----------
+  async function loadSupplierSering() {
+    const el = document.getElementById('supplierFrequentCards');
+    try {
+      const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'daftar_supplier_sering_app' }) });
+      const json = await resp.json();
+      const daftar = (json.success && json.hasil) ? json.hasil : [];
+      if (!daftar.length) { el.innerHTML = '<div class="empty-text">Belum ada daftar. Cari manual di bawah.</div>'; return; }
+      el.innerHTML = '';
+      daftar.forEach(function (s) {
+        const d = document.createElement('div');
+        d.className = 'item-card';
+        d.innerHTML = '<div class="nama">' + s.namaSupplier + '</div><div class="kode">' + s.kodeVendor + '</div>';
+        d.onclick = function () { pilihSupplier(s); };
+        el.appendChild(d);
+      });
+    } catch (err) {
+      el.innerHTML = '<div class="empty-text">Gagal memuat: ' + err.message + '</div>';
+    }
+  }
+
+  // ---------- Supplier search (fallback) ----------
   document.getElementById('supplierSearch').addEventListener('input', function (e) {
     const q = e.target.value.trim();
-    clearTimeout(debounceSupplier);
     if (q.length < 2) { document.getElementById('supplierHasil').innerHTML = ''; return; }
-    debounceSupplier = setTimeout(function () { cariSupplier(q); }, 350);
+    cariSupplier(q);
   });
-
-  let supplierFetchController = null;
 
   async function cariSupplier(query, percobaanKe) {
     percobaanKe = percobaanKe || 1;
@@ -181,21 +221,64 @@
 
   function pilihSupplier(s) {
     supplierTerpilih = s;
-    document.getElementById('supplierHasil').innerHTML = '';
+    document.getElementById('supplierFrequentCards').style.display = 'none';
     document.getElementById('supplierSearch').style.display = 'none';
+    document.getElementById('supplierHasil').innerHTML = '';
     document.getElementById('supplierChip').innerHTML = '<div class="chip">' + s.namaSupplier + ' <span class="x" onclick="gantiSupplier()">✕</span></div>';
     document.getElementById('dilWarning').style.display = s.isDIL ? 'block' : 'none';
   }
   function gantiSupplier() {
     supplierTerpilih = null;
+    document.getElementById('supplierFrequentCards').style.display = 'grid';
     document.getElementById('supplierSearch').style.display = 'block';
     document.getElementById('supplierSearch').value = '';
     document.getElementById('supplierChip').innerHTML = '';
     document.getElementById('dilWarning').style.display = 'none';
   }
 
-  // ---------- Item rows ----------
-  function tambahItemRow() {
+  // ---------- Barang sering dibeli (kartu) ----------
+  async function loadItemSering() {
+    const el = document.getElementById('itemFrequentCards');
+    try {
+      const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'daftar_item_sering_app' }) });
+      const json = await resp.json();
+      const daftar = (json.success && json.hasil) ? json.hasil : [];
+      if (!daftar.length) { el.innerHTML = '<div class="empty-text">Belum ada daftar. Cari manual pakai tombol "Cari Barang Lain".</div>'; return; }
+      el.innerHTML = '';
+      daftar.forEach(function (it) {
+        const d = document.createElement('div');
+        d.className = 'item-card';
+        d.innerHTML = '<div class="nama">' + it.nama + '</div><div class="kode">' + it.sku + '</div>';
+        d.onclick = function () { tambahItemDariKartu(it); };
+        el.appendChild(d);
+      });
+    } catch (err) {
+      el.innerHTML = '<div class="empty-text">Gagal memuat: ' + err.message + '</div>';
+    }
+  }
+
+  function tambahItemDariKartu(it) {
+    itemCounter++;
+    const id = 'item' + itemCounter;
+    items[id] = { sku: it.sku, nama: it.nama, qty: 1, harga: 0 };
+
+    const div = document.createElement('div');
+    div.className = 'item-row';
+    div.id = 'row-' + id;
+    div.innerHTML =
+      '<span class="hapus-item" onclick="hapusItemRow(\'' + id + '\')">✕ Hapus</span>' +
+      '<div class="nama-terpilih">' + it.nama + '</div>' +
+      '<div class="row-inputs">' +
+        '<div><label style="margin-top:0;">Qty</label><input type="number" value="1" oninput="updateItemQty(\'' + id + '\', this.value)"></div>' +
+        '<div><label style="margin-top:0;">Harga satuan</label><input type="number" oninput="updateItemHarga(\'' + id + '\', this.value)"></div>' +
+      '</div>';
+    document.getElementById('itemRows').appendChild(div);
+    hitungTotal();
+    if (tg) tg.HapticFeedback && tg.HapticFeedback.impactOccurred('light');
+  }
+
+  // ---------- Barang lewat search (fallback, buat yang nggak ada di kartu) ----------
+  function tambahItemRowKosong() {
     itemCounter++;
     const id = 'item' + itemCounter;
     items[id] = { sku: null, nama: null, qty: 1, harga: 0 };
@@ -204,8 +287,8 @@
     div.id = 'row-' + id;
     div.innerHTML =
       '<span class="hapus-item" onclick="hapusItemRow(\'' + id + '\')">✕ Hapus</span>' +
-      '<div class="search-wrap">' +
-        '<input type="text" placeholder="Cari nama barang..." oninput="cariItemDebounced(\'' + id + '\', this.value)">' +
+      '<div class="search-wrap" style="margin-top:0;">' +
+        '<input type="text" placeholder="Cari nama/SKU barang..." oninput="cariItemBarang(\'' + id + '\', this.value)">' +
         '<div class="hasil-list" id="hasil-' + id + '"></div>' +
         '<div id="chip-' + id + '"></div>' +
       '</div>' +
@@ -222,18 +305,10 @@
     hitungTotal();
   }
 
-  function cariItemDebounced(id, q) {
-    clearTimeout(debounceItemTimers[id]);
-    q = q.trim();
-    if (q.length < 2) { document.getElementById('hasil-' + id).innerHTML = ''; return; }
-    debounceItemTimers[id] = setTimeout(function () { cariItemBarang(id, q); }, 350);
-  }
-
-  const itemFetchControllers = {};
-
   async function cariItemBarang(id, query, percobaanKe) {
     percobaanKe = percobaanKe || 1;
     const el = document.getElementById('hasil-' + id);
+    if (query.trim().length < 2) { el.innerHTML = ''; return; }
 
     if (itemFetchControllers[id]) itemFetchControllers[id].abort();
     const controller = new AbortController();
