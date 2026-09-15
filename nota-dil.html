@@ -16,18 +16,22 @@
   label:first-child { margin-top: 0; }
   input { width: 100%; padding: 11px; border: 1px solid #d0d0d0; border-radius: 8px; font-size: 15px; }
   input:focus { outline: none; border-color: #1a3a5c; }
-  .search-wrap { position: relative; }
-  .hasil-list { margin-top: 6px; }
-  .hasil-item { background: #f7f9fb; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; cursor: pointer; font-size: 13px; }
-  .hasil-item:active { background: #eaf1f8; }
-  .hasil-item .kode { font-size: 11px; color: #888; margin-top: 2px; }
-  .chip { display: inline-flex; align-items: center; gap: 8px; background: #eaf1f8; border: 1px solid #1a3a5c; border-radius: 20px; padding: 6px 12px; font-size: 13px; font-weight: 600; margin-top: 6px; }
-  .item-row { border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; margin-top: 10px; position: relative; }
-  .item-row .row-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .item-row .hapus-item { position: absolute; top: 8px; right: 8px; color: #c0392b; font-size: 12px; cursor: pointer; }
-  .btn-tambah { width: 100%; padding: 10px; background: #eaf1f8; color: #1a3a5c; border: 1px dashed #1a3a5c; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 10px; }
-  .total-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: 700; margin-top: 14px; padding-top: 10px; border-top: 1px solid #ddd; }
   input[type=file] { padding: 8px; font-size: 13px; }
+
+  .item-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .item-card { background: #f7f9fb; border: 2px solid #e0e0e0; border-radius: 12px; padding: 14px 10px; text-align: center; cursor: pointer; }
+  .item-card:active { border-color: #1a3a5c; background: #eaf1f8; }
+  .item-card .icon { font-size: 26px; margin-bottom: 6px; }
+  .item-card .nama { font-weight: 600; font-size: 13px; line-height: 1.3; }
+  .item-card .satuan { font-size: 11px; color: #666; margin-top: 4px; }
+  .empty-text { font-size: 13px; color: #888; }
+
+  .item-row { border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin-top: 12px; position: relative; }
+  .item-row .nama-terpilih { font-weight: 600; font-size: 13px; margin-bottom: 8px; padding-right: 60px; }
+  .item-row .row-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .item-row .hapus-item { position: absolute; top: 10px; right: 10px; color: #c0392b; font-size: 12px; cursor: pointer; }
+
+  .total-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: 700; margin-top: 14px; padding-top: 10px; border-top: 1px solid #ddd; }
   button.submit-btn { width: 100%; margin-top: 6px; padding: 14px; background: #1a3a5c; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
   button.submit-btn:disabled { background: #a0a0a0; }
   .result { display: none; margin-top: 16px; padding: 14px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
@@ -52,9 +56,15 @@
   </div>
 
   <div class="card">
-    <h2>Barang</h2>
+    <h2>Tap barang buat tambahin ke nota</h2>
+    <div class="item-grid" id="itemCards">
+      <div class="empty-text">Memuat daftar barang...</div>
+    </div>
+  </div>
+
+  <div class="card" id="barangDipilihCard" style="display:none;">
+    <h2>Barang di nota ini</h2>
     <div id="itemRows"></div>
-    <button class="btn-tambah" onclick="tambahItemRow()">+ Tambah Barang</button>
     <div class="total-row"><span>Total</span><span id="totalDisplay">Rp 0</span></div>
   </div>
 
@@ -65,10 +75,10 @@
 <script>
   const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
 
-  let itemCounter = 0;
+  let rowCounter = 0;
   // id -> { skuDil, satuanDil, skuDkms, namaDkms, qtyPerSatuan, qtyDil, hargaSatuanDil }
-  const items = {};
-  let semuaItemDil = []; // dimuat sekali di awal, difilter lokal (instan, nggak nunggu server)
+  const rows = {};
+  let semuaItemDil = [];
 
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   if (tg) { tg.ready(); tg.expand(); }
@@ -78,12 +88,12 @@
 
   document.getElementById('tanggal').valueAsDate = new Date();
   loadDaftarItemDil();
-  tambahItemRow();
 
   function formatRp(n) { return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
 
-  // ---------- Load daftar item DIL sekali di awal ----------
+  // ---------- Load daftar item DIL & render kartu ----------
   async function loadDaftarItemDil() {
+    const el = document.getElementById('itemCards');
     try {
       const resp = await fetch(WEB_APP_URL, {
         method: 'POST',
@@ -91,82 +101,66 @@
         body: JSON.stringify({ action: 'daftar_item_dil_app' })
       });
       const json = await resp.json();
-      if (json.success) semuaItemDil = json.hasil || [];
+      semuaItemDil = (json.success && json.hasil) ? json.hasil : [];
+      if (!semuaItemDil.length) {
+        el.innerHTML = '<div class="empty-text">Belum ada barang di tab "Konversi Item DIL". Tambahin dulu di sheet-nya.</div>';
+        return;
+      }
+      el.innerHTML = '';
+      semuaItemDil.forEach(function (it) {
+        const d = document.createElement('div');
+        d.className = 'item-card';
+        d.innerHTML =
+          '<div class="icon">\u{1F4E6}</div>' +
+          '<div class="nama">' + it.namaDkms + '</div>' +
+          '<div class="satuan">' + it.skuDil + ' \u00b7 per ' + it.satuanDil + '</div>';
+        d.onclick = function () { tambahBarisDariKartu(it); };
+        el.appendChild(d);
+      });
     } catch (err) {
-      console.error('Gagal load daftar item DIL:', err);
+      el.innerHTML = '<div class="empty-text">Gagal memuat daftar barang: ' + err.message + '</div>';
     }
   }
 
-  // ---------- Item rows ----------
-  function tambahItemRow() {
-    itemCounter++;
-    const id = 'item' + itemCounter;
-    items[id] = { skuDil: null, satuanDil: null, skuDkms: null, namaDkms: null, qtyPerSatuan: 1, qtyDil: 1, hargaSatuanDil: 0 };
+  // ---------- Baris barang terpilih ----------
+  function tambahBarisDariKartu(it) {
+    rowCounter++;
+    const id = 'row' + rowCounter;
+    rows[id] = {
+      skuDil: it.skuDil, satuanDil: it.satuanDil, skuDkms: it.skuDkms,
+      namaDkms: it.namaDkms, qtyPerSatuan: it.qtyPerSatuan,
+      qtyDil: 1, hargaSatuanDil: 0
+    };
+
     const div = document.createElement('div');
     div.className = 'item-row';
-    div.id = 'row-' + id;
+    div.id = 'itemrow-' + id;
     div.innerHTML =
-      '<span class="hapus-item" onclick="hapusItemRow(\'' + id + '\')">✕ Hapus</span>' +
-      '<div class="search-wrap">' +
-        '<input type="text" placeholder="Cari nama barang DIL..." oninput="cariItemLokal(\'' + id + '\', this.value)">' +
-        '<div class="hasil-list" id="hasil-' + id + '"></div>' +
-        '<div id="chip-' + id + '"></div>' +
-      '</div>' +
-      '<div class="row-inputs" style="margin-top:8px;">' +
-        '<div><label id="labelQty-' + id + '" style="margin-top:0;">Jumlah</label><input type="number" value="1" oninput="updateItemQty(\'' + id + '\', this.value)"></div>' +
-        '<div><label id="labelHarga-' + id + '" style="margin-top:0;">Harga satuan</label><input type="number" oninput="updateItemHarga(\'' + id + '\', this.value)"></div>' +
+      '<span class="hapus-item" onclick="hapusBaris(\'' + id + '\')">\u2715 Hapus</span>' +
+      '<div class="nama-terpilih">' + it.skuDil + ' (' + it.satuanDil + ') \u2192 ' + it.namaDkms + '</div>' +
+      '<div class="row-inputs">' +
+        '<div><label style="margin-top:0;">Jumlah (' + it.satuanDil + ')</label><input type="number" value="1" oninput="updateQty(\'' + id + '\', this.value)"></div>' +
+        '<div><label style="margin-top:0;">Harga per ' + it.satuanDil + '</label><input type="number" oninput="updateHarga(\'' + id + '\', this.value)"></div>' +
       '</div>';
     document.getElementById('itemRows').appendChild(div);
+    document.getElementById('barangDipilihCard').style.display = 'block';
+    hitungTotal();
+    if (tg) tg.HapticFeedback && tg.HapticFeedback.impactOccurred('light');
   }
 
-  function hapusItemRow(id) {
-    delete items[id];
-    document.getElementById('row-' + id).remove();
+  function hapusBaris(id) {
+    delete rows[id];
+    document.getElementById('itemrow-' + id).remove();
+    if (Object.keys(rows).length === 0) document.getElementById('barangDipilihCard').style.display = 'none';
     hitungTotal();
   }
 
-  function cariItemLokal(id, q) {
-    q = q.trim().toLowerCase();
-    const el = document.getElementById('hasil-' + id);
-    if (q.length < 1) { el.innerHTML = ''; return; }
-    const hasil = semuaItemDil.filter(function (it) {
-      return it.skuDil.toLowerCase().indexOf(q) !== -1 || (it.namaDkms || '').toLowerCase().indexOf(q) !== -1;
-    });
-    if (!hasil.length) {
-      el.innerHTML = '<div class="hasil-item">Nggak ketemu. Cek/tambah dulu di tab "Konversi Item DIL".</div>';
-      return;
-    }
-    el.innerHTML = '';
-    hasil.forEach(function (it) {
-      const d = document.createElement('div');
-      d.className = 'hasil-item';
-      d.innerHTML = it.skuDil + ' \u2192 ' + it.namaDkms +
-        '<div class="kode">satuan: ' + it.satuanDil + ' (1 ' + it.satuanDil + ' = ' + it.qtyPerSatuan + ' ' + it.skuDkms + ')</div>';
-      d.onclick = function () { pilihItemBarang(id, it); };
-      el.appendChild(d);
-    });
-  }
-
-  function pilihItemBarang(id, it) {
-    items[id].skuDil = it.skuDil;
-    items[id].satuanDil = it.satuanDil;
-    items[id].skuDkms = it.skuDkms;
-    items[id].namaDkms = it.namaDkms;
-    items[id].qtyPerSatuan = it.qtyPerSatuan;
-    document.getElementById('hasil-' + id).innerHTML = '';
-    document.querySelector('#row-' + id + ' input[type=text]').style.display = 'none';
-    document.getElementById('chip-' + id).innerHTML = '<div class="chip">' + it.skuDil + ' (' + it.satuanDil + ') \u2192 ' + it.namaDkms + '</div>';
-    document.getElementById('labelQty-' + id).textContent = 'Jumlah (' + it.satuanDil + ')';
-    document.getElementById('labelHarga-' + id).textContent = 'Harga per ' + it.satuanDil;
-    hitungTotal();
-  }
-
-  function updateItemQty(id, v) { items[id].qtyDil = parseFloat(v) || 0; hitungTotal(); }
-  function updateItemHarga(id, v) { items[id].hargaSatuanDil = parseFloat(v) || 0; hitungTotal(); }
+  function updateQty(id, v) { rows[id].qtyDil = parseFloat(v) || 0; hitungTotal(); }
+  function updateHarga(id, v) { rows[id].hargaSatuanDil = parseFloat(v) || 0; hitungTotal(); }
 
   function hitungTotal() {
     let total = 0;
-    Object.values(items).forEach(function (it) { total += (it.qtyDil || 0) * (it.hargaSatuanDil || 0); });
+    Object.values(rows).forEach(function (it) { total += (it.qtyDil || 0) * (it.hargaSatuanDil || 0); });
     document.getElementById('totalDisplay').textContent = formatRp(total);
   }
 
@@ -186,8 +180,8 @@
     const tanggal = document.getElementById('tanggal').value;
     if (!tanggal) return tampilkanHasil(false, 'Tanggal belum diisi.');
 
-    const itemList = Object.values(items).filter(function (it) { return it.skuDil && it.qtyDil > 0; });
-    if (!itemList.length) return tampilkanHasil(false, 'Belum ada barang yang lengkap diisi.');
+    const itemList = Object.values(rows).filter(function (it) { return it.skuDil && it.qtyDil > 0; });
+    if (!itemList.length) return tampilkanHasil(false, 'Belum ada barang yang ditambahin.');
 
     const btn = document.getElementById('submitBtn');
     btn.disabled = true; btn.textContent = 'Menyimpan...';
