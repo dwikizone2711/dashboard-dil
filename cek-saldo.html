@@ -22,8 +22,8 @@
 <div id="list" class="loading">Memuat saldo...</div>
 
 <script>
-  const tg = window.Telegram.WebApp;
-  tg.expand();
+  const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+if (tg) { tg.ready(); tg.expand(); }
 
   const params = new URLSearchParams(window.location.search);
   const entitas = params.get('entitas') || 'dkms'; // 'dkms' atau 'dil'
