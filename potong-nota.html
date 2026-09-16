@@ -41,8 +41,8 @@
 <div class="status" id="status"></div>
 
 <script>
-const tg = window.Telegram.WebApp;
-tg.expand();
+const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+if (tg) { tg.ready(); tg.expand(); }
 const initData = tg.initDataUnsafe || {};
 const chatId = initData.user ? initData.user.id : null;
 
