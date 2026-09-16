@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Potong Nota</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  body { font-family: -apple-system, sans-serif; background: #f0f2f5; margin: 0; padding: 16px; }
+  h2 { font-size: 18px; margin-bottom: 12px; }
+  select, input { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; margin-bottom: 12px; }
+  .info-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+  .info-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; }
+  .info-row .val { font-weight: 600; }
+  .hutang { color: #c00; }
+  .piutang { color: #1a7a3c; }
+  button { width: 100%; background: #1a7a3c; color: #fff; border: none; padding: 14px; border-radius: 8px; font-size: 15px; font-weight: 600; }
+  button:disabled { background: #aaa; }
+  .status { text-align: center; font-size: 13px; color: #888; margin-top: 10px; }
+</style>
+</head>
+<body>
+<h2>🔁 Potong Nota</h2>
+
+<select id="supplierSelect" onchange="pilihSupplier()">
+  <option value="">-- pilih supplier --</option>
+</select>
+
+<div class="info-card" id="infoCard" style="display:none">
+  <div class="info-row"><span>Hutang ke supplier ini</span><span class="val hutang" id="totalHutang">-</span></div>
+  <div class="info-row"><span>Piutang dari supplier ini</span><span class="val piutang" id="totalPiutang">-</span></div>
+</div>
+
+<label style="font-size:13px;color:#555">Nominal dipotong</label>
+<input type="number" id="nominal" placeholder="0">
+
+<label style="font-size:13px;color:#555">Tanggal</label>
+<input type="date" id="tanggal">
+
+<button id="btnSubmit" onclick="submitPotong()" disabled>Proses Potong Nota</button>
+<div class="status" id="status"></div>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.expand();
+const initData = tg.initDataUnsafe || {};
+const chatId = initData.user ? initData.user.id : null;
+
+const GAS_URL = 'ISI_URL_WEBAPP_GAS_DKMS';
+let daftarSupplier = [];
+
+document.getElementById('tanggal').valueAsDate = new Date();
+
+fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'daftar_potong_nota' }) })
+  .then(r => r.json())
+  .then(data => {
+    daftarSupplier = data.daftar || [];
+    const sel = document.getElementById('supplierSelect');
+    daftarSupplier.forEach((s, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = s.nama + (s.siap ? '' : ' ⚠️ belum lengkap');
+      opt.disabled = !s.siap;
+      sel.appendChild(opt);
+    });
+  });
+
+function pilihSupplier() {
+  const idx = document.getElementById('supplierSelect').value;
+  if (idx === '') { document.getElementById('infoCard').style.display = 'none'; document.getElementById('btnSubmit').disabled = true; return; }
+  const s = daftarSupplier[idx];
+  setStatus('Mengambil data hutang/piutang...');
+  fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'detail_potong_nota', vendorNo: s.vendorNo, customerNo: s.customerNo }) })
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('infoCard').style.display = 'block';
+      document.getElementById('totalHutang').textContent = 'Rp ' + Math.round(data.totalHutang).toLocaleString('id-ID');
+      document.getElementById('totalPiutang').textContent = 'Rp ' + Math.round(data.totalPiutang).toLocaleString('id-ID');
+      document.getElementById('nominal').value = Math.round(data.maxPotong);
+      document.getElementById('btnSubmit').disabled = false;
+      setStatus('');
+    });
+}
+
+function submitPotong() {
+  const idx = document.getElementById('supplierSelect').value;
+  const s = daftarSupplier[idx];
+  const nominal = Number(document.getElementById('nominal').value) || 0;
+  const tanggal = document.getElementById('tanggal').value;
+  if (nominal <= 0) return setStatus('Isi nominal dulu.');
+
+  document.getElementById('btnSubmit').disabled = true;
+  setStatus('Memproses...');
+
+  fetch(GAS_URL, {
+    method: 'POST', headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({
+      action: 'submit_potong_nota', namaSupplierCustomer: s.nama,
+      vendorNo: s.vendorNo, customerNo: s.customerNo,
+      tanggal: tanggal, nominal: nominal, chatId: chatId
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      setStatus('✅ Potong nota berhasil! Penerimaan ' + data.noPenerimaan + ', Pembayaran ' + data.noPembayaran);
+      tg.close();
+    } else {
+      setStatus('❌ ' + data.error);
+      document.getElementById('btnSubmit').disabled = false;
+    }
+  })
+  .catch(err => { setStatus('Error: ' + err.message); document.getElementById('btnSubmit').disabled = false; });
+}
+
+function setStatus(msg) { document.getElementById('status').textContent = msg; }
+</script>
+</body>
+</html>
