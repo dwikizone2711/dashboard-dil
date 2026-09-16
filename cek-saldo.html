@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cek Saldo Akun</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  body { font-family: -apple-system, sans-serif; background: #f0f2f5; margin: 0; padding: 16px; }
+  h2 { font-size: 18px; margin-bottom: 4px; }
+  .updated { color: #888; font-size: 12px; margin-bottom: 16px; }
+  .card { background: #fff; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .label { font-size: 14px; color: #333; }
+  .saldo { font-size: 16px; font-weight: 600; color: #1a7a3c; }
+  .saldo.null { color: #c00; font-weight: normal; font-size: 13px; }
+  .loading { text-align: center; color: #888; padding: 40px 0; }
+</style>
+</head>
+<body>
+<h2 id="judul">Saldo Akun</h2>
+<div class="updated" id="updated"></div>
+<div id="list" class="loading">Memuat saldo...</div>
+
+<script>
+  const tg = window.Telegram.WebApp;
+  tg.expand();
+
+  const params = new URLSearchParams(window.location.search);
+  const entitas = params.get('entitas') || 'dkms'; // 'dkms' atau 'dil'
+  const GAS_URL = entitas === 'dil'
+    ? 'ISI_URL_WEBAPP_GAS_DIL'
+    : 'ISI_URL_WEBAPP_GAS_DKMS';
+
+  document.getElementById('judul').textContent = 'Saldo Akun ' + entitas.toUpperCase();
+
+  fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' }, // hindari CORS preflight, pola sama kayak konfirmasi-tanggal.html
+    body: JSON.stringify({ action: entitas === 'dil' ? 'cek_saldo_dil' : 'cek_saldo_dkms' })
+  })
+  .then(r => r.json())
+  .then(data => {
+    const listEl = document.getElementById('list');
+    listEl.className = '';
+    listEl.innerHTML = '';
+    document.getElementById('updated').textContent = 'Update: ' + (data.updatedAt || '-');
+
+    if (!data.success) {
+      listEl.textContent = 'Gagal ambil saldo: ' + (data.error || 'unknown');
+      return;
+    }
+
+    data.daftarSaldo.forEach(akun => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      const saldoText = akun.saldo === null
+        ? '<span class="saldo null">gagal ambil</span>'
+        : '<span class="saldo">Rp ' + Math.round(akun.saldo).toLocaleString('id-ID') + '</span>';
+      card.innerHTML = '<span class="label">' + akun.label + '</span>' + saldoText;
+      listEl.appendChild(card);
+    });
+  })
+  .catch(err => {
+    document.getElementById('list').textContent = 'Error: ' + err.message;
+  });
+</script>
+</body>
+</html>
