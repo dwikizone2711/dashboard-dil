@@ -28,8 +28,8 @@
   const params = new URLSearchParams(window.location.search);
   const entitas = params.get('entitas') || 'dkms'; // 'dkms' atau 'dil'
   const GAS_URL = entitas === 'dil'
-    ? 'ISI_URL_WEBAPP_GAS_DIL'
-    : 'ISI_URL_WEBAPP_GAS_DKMS';
+    ? 'https://script.google.com/macros/s/AKfycby2wyVacT1kFqYt5481dypHMCp5T_Eg_KertLLWXNE0yu3YqKg4RiDNiqKWPlwGvhCxqw/exec'
+    : 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
 
   document.getElementById('judul').textContent = 'Saldo Akun ' + entitas.toUpperCase();
 
