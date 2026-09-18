@@ -133,6 +133,40 @@
   const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
   const BANK = { bca: '110105', lkab: '110242' };
 
+  // Supplier sering dibeli — hardcode biar tap langsung, nggak nunggu fetch.
+  const SUPPLIER_SERING_QUICK = [
+    { namaSupplier: 'SHENAR', kodeVendor: 'V.00112', isDIL: false },
+    { namaSupplier: 'PT AYYUBI BERKAH NUSANTARA', kodeVendor: 'V.00060', isDIL: false },
+    { namaSupplier: 'Widanaesya Grosir', kodeVendor: 'V.00116', isDIL: false },
+    { namaSupplier: 'Lia Textile', kodeVendor: 'V.00065', isDIL: false },
+    { namaSupplier: 'MJS', kodeVendor: 'DZS-004', isDIL: false },
+    { namaSupplier: 'ANANTA GROSIR', kodeVendor: 'V.00091', isDIL: false },
+    { namaSupplier: 'BERKAH HOKI', kodeVendor: 'DZS-007', isDIL: false },
+    { namaSupplier: 'H&P Perabot Herman', kodeVendor: 'V.00052', isDIL: false },
+    { namaSupplier: 'PONCO', kodeVendor: 'V.00167', isDIL: false },
+    { namaSupplier: 'IBRAHIM GROUP', kodeVendor: 'DZS-002', isDIL: false },
+    { namaSupplier: 'BINTANG GROSIR', kodeVendor: 'DZS-006', isDIL: false },
+    { namaSupplier: 'ALI STORE BEKASI', kodeVendor: 'V.00166', isDIL: false }
+  ];
+
+  // Barang sering dibeli — hardcode juga (SKU + nama tampilan).
+  const ITEM_SERING_QUICK = [
+    { sku: 'TMA-002', nama: 'Tikar Spon 120x100' },
+    { sku: 'JRT-748', nama: 'Jemuran Rak Handuk' },
+    { sku: 'SRB-093', nama: 'Serbet Dapur' },
+    { sku: 'BKS-392', nama: 'Hanger PVC Warna (HK350)' },
+    { sku: 'TME-002-random', nama: 'Tikar Mercy Evamatic' },
+    { sku: 'TBBM-002', nama: 'Tikar Karpet Bolak Balik' },
+    { sku: 'GHLP-0324', nama: 'Hanger Jilbab 5 Susun' },
+    { sku: 'TK-001', nama: 'Tisu Kompor 200gr' },
+    { sku: 'TP-002-TOPRON', nama: 'Topron' },
+    { sku: 'CLTX-1423', nama: 'Cleantexs 1000ml' },
+    { sku: '100030', nama: 'Bubble Wrap' },
+    { sku: '100031', nama: 'Plastik Packing HD PE' },
+    { sku: '100042', nama: 'Kertas Thermal Label' },
+    { sku: 'LSI-002', nama: 'Lakban Bening 45x60' }
+  ];
+
   let supplierTerpilih = null;
   let bankTerpilih = 'bca';
   let tipeBayar = 'tempo';
@@ -154,27 +188,18 @@
 
   function formatRp(n) { return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
 
-  // ---------- Supplier sering dibeli (kartu) ----------
-  async function loadSupplierSering(percobaanKe) {
-    percobaanKe = percobaanKe || 1;
+  // ---------- Supplier sering dibeli (kartu, langsung render, tanpa fetch) ----------
+  function loadSupplierSering() {
     const el = document.getElementById('supplierFrequentCards');
-    try {
-      const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'daftar_supplier_sering_app' }) });
-      const json = await resp.json();
-      const daftar = (json.success && json.hasil) ? json.hasil : [];
-      if (!daftar.length) { el.innerHTML = '<div class="empty-text">Belum ada daftar. Cari manual di bawah.</div>'; return; }
-      el.innerHTML = '';
-      daftar.forEach(function (s) {
-        const d = document.createElement('div');
-        d.className = 'item-card';
-        d.innerHTML = '<div class="nama">' + s.namaSupplier + '</div><div class="kode">' + s.kodeVendor + '</div>';
-        d.onclick = function () { pilihSupplier(s); };
-        el.appendChild(d);
-      });
-    } catch (err) {
-      if (percobaanKe < 3) { return setTimeout(function () { loadSupplierSering(percobaanKe + 1); }, 1200); }
-      el.innerHTML = '<div class="empty-text">Gagal memuat (koneksi lemot?). <span style="color:#1a3a5c; text-decoration:underline; cursor:pointer;" onclick="loadSupplierSering()">Coba lagi</span></div>';
-    }
+    if (!SUPPLIER_SERING_QUICK.length) { el.innerHTML = '<div class="empty-text">Belum ada daftar. Cari manual di bawah.</div>'; return; }
+    el.innerHTML = '';
+    SUPPLIER_SERING_QUICK.forEach(function (s) {
+      const d = document.createElement('div');
+      d.className = 'item-card';
+      d.innerHTML = '<div class="nama">' + s.namaSupplier + '</div><div class="kode">' + s.kodeVendor + '</div>';
+      d.onclick = function () { pilihSupplier(s); };
+      el.appendChild(d);
+    });
   }
 
   // ---------- Supplier search (fallback) ----------
@@ -238,27 +263,18 @@
     document.getElementById('dilWarning').style.display = 'none';
   }
 
-  // ---------- Barang sering dibeli (kartu) ----------
-  async function loadItemSering(percobaanKe) {
-    percobaanKe = percobaanKe || 1;
+  // ---------- Barang sering dibeli (kartu, langsung render, tanpa fetch) ----------
+  function loadItemSering() {
     const el = document.getElementById('itemFrequentCards');
-    try {
-      const resp = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'daftar_item_sering_app' }) });
-      const json = await resp.json();
-      const daftar = (json.success && json.hasil) ? json.hasil : [];
-      if (!daftar.length) { el.innerHTML = '<div class="empty-text">Belum ada daftar. Cari manual pakai tombol "Cari Barang Lain".</div>'; return; }
-      el.innerHTML = '';
-      daftar.forEach(function (it) {
-        const d = document.createElement('div');
-        d.className = 'item-card';
-        d.innerHTML = '<div class="nama">' + it.nama + '</div><div class="kode">' + it.sku + '</div>';
-        d.onclick = function () { tambahItemDariKartu(it); };
-        el.appendChild(d);
-      });
-    } catch (err) {
-      if (percobaanKe < 3) { return setTimeout(function () { loadItemSering(percobaanKe + 1); }, 1200); }
-      el.innerHTML = '<div class="empty-text">Gagal memuat (koneksi lemot?). <span style="color:#1a3a5c; text-decoration:underline; cursor:pointer;" onclick="loadItemSering()">Coba lagi</span></div>';
-    }
+    if (!ITEM_SERING_QUICK.length) { el.innerHTML = '<div class="empty-text">Belum ada daftar. Cari manual pakai tombol "Cari Barang Lain".</div>'; return; }
+    el.innerHTML = '';
+    ITEM_SERING_QUICK.forEach(function (it) {
+      const d = document.createElement('div');
+      d.className = 'item-card';
+      d.innerHTML = '<div class="nama">' + it.nama + '</div><div class="kode">' + it.sku + '</div>';
+      d.onclick = function () { tambahItemDariKartu(it); };
+      el.appendChild(d);
+    });
   }
 
   function tambahItemDariKartu(it) {
