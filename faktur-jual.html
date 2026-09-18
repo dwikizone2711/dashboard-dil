@@ -10,13 +10,26 @@
   h2 { font-size: 18px; margin-bottom: 12px; }
   label { font-size: 13px; color: #555; display: block; margin: 12px 0 4px; }
   input, select { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; }
-  .dropdown { position: relative; }
+  .dropdown { position: relative; margin-top: 6px; }
   .options { position: absolute; z-index: 10; background: #fff; width: 100%; max-height: 180px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; margin-top: 2px; }
   .options div { padding: 10px; border-bottom: 1px solid #f0f0f0; font-size: 13px; cursor: pointer; }
   .options div:hover { background: #f5f5f5; }
-  .item-row { background: #fff; border-radius: 8px; padding: 10px; margin-top: 10px; position: relative; }
+
+  .quick-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .chip { background: #eef2ff; color: #3949ab; border: none; border-radius: 20px; padding: 9px 14px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .chip:active { background: #dde2fa; }
+  .chip-lain { background: #f0f0f0; color: #555; font-weight: normal; }
+
+  .selected-tag { display: none; align-items: center; justify-content: space-between; background: #eef7ee; border: 1px solid #cfe8cf; border-radius: 8px; padding: 10px 12px; margin-top: 6px; font-size: 14px; }
+  .selected-tag .nama { font-weight: 600; color: #1a7a3c; }
+  .selected-tag .ganti { color: #3949ab; font-size: 13px; }
+
+  .item-row { background: #fff; border-radius: 8px; padding: 10px; margin-top: 10px; }
+  .item-row-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .item-row-header .item-title { font-size: 14px; font-weight: 600; color: #333; overflow-wrap: anywhere; }
+  .item-row-header .hapus { flex-shrink: 0; color: #c00; font-size: 13px; font-weight: 600; padding: 4px 6px; white-space: nowrap; }
   .item-row .qty-harga { display: flex; gap: 8px; margin-top: 8px; }
-  .item-row .hapus { position: absolute; top: 6px; right: 8px; color: #c00; font-size: 12px; cursor: pointer; }
+
   .tambah-item { margin-top: 10px; background: #eef2ff; color: #3949ab; border: none; padding: 10px; border-radius: 8px; width: 100%; font-size: 14px; }
   .submit-bar { position: fixed; bottom: 0; left: 0; right: 0; padding: 12px 16px; background: #fff; box-shadow: 0 -2px 6px rgba(0,0,0,0.08); }
   .submit-bar button { width: 100%; background: #1a7a3c; color: #fff; border: none; padding: 14px; border-radius: 8px; font-size: 15px; font-weight: 600; }
@@ -29,9 +42,19 @@
 <h2>🧾 Faktur Penjualan</h2>
 
 <label>Customer</label>
-<div class="dropdown">
+<div class="quick-chips" id="customerChips">
+  <button type="button" class="chip" onclick="pilihCustomerCepat('Ibrahim')">Ibrahim</button>
+  <button type="button" class="chip" onclick="pilihCustomerCepat('Jessen')">Jessen</button>
+  <button type="button" class="chip" onclick="pilihCustomerCepat('Mangungsong')">Mangungsong</button>
+  <button type="button" class="chip chip-lain" onclick="focusCustomerSearch()">Lainnya...</button>
+</div>
+<div class="dropdown" id="customerSearchWrap" style="display:none">
   <input id="customerInput" placeholder="Ketik nama customer...">
   <div class="options" id="customerOptions"></div>
+</div>
+<div class="selected-tag" id="customerSelectedTag">
+  <span class="nama" id="customerSelectedNama"></span>
+  <span class="ganti" onclick="gantiCustomer()">Ganti</span>
 </div>
 <input type="hidden" id="customerNo">
 
@@ -49,8 +72,8 @@
 </div>
 
 <script>
-const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-if (tg) { tg.ready(); tg.expand(); }
+const tg = window.Telegram.WebApp;
+tg.expand();
 const initData = tg.initDataUnsafe || {};
 const chatId = initData.user ? initData.user.id : null;
 
@@ -58,9 +81,52 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_
 let customerNamaTerpilih = '';
 let items = [];
 
+// Barang yang paling sering dipakai — tampil sebagai tombol cepat di tiap baris item
+const ITEM_CEPAT = [
+  { label: 'GHKS-500PCS', query: 'GHKS-500PCS' },
+  { label: 'TMA-002', query: 'TMA-002' }
+];
+
 document.getElementById('tanggal').valueAsDate = new Date();
 
-// ---- Customer search-as-you-type ----
+// ================= CUSTOMER =================
+
+function pilihCustomerCepat(nama) {
+  setStatus('Mencari ' + nama + '...');
+  fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'cari_customer_faktur_jual', query: nama }) })
+    .then(r => r.json())
+    .then(data => {
+      setStatus('');
+      const hasil = data.hasil || [];
+      if (hasil.length === 0) { setStatus('Customer "' + nama + '" tidak ketemu, coba cari manual.'); focusCustomerSearch(); return; }
+      pilihCustomer(hasil[0]);
+    })
+    .catch(() => { setStatus('Gagal cari customer, coba lagi.'); });
+}
+
+function pilihCustomer(c) {
+  document.getElementById('customerNo').value = c.kodeCustomer;
+  customerNamaTerpilih = c.namaCustomer;
+  document.getElementById('customerChips').style.display = 'none';
+  document.getElementById('customerSearchWrap').style.display = 'none';
+  document.getElementById('customerOptions').innerHTML = '';
+  document.getElementById('customerInput').value = '';
+  document.getElementById('customerSelectedNama').textContent = c.namaCustomer;
+  document.getElementById('customerSelectedTag').style.display = 'flex';
+}
+
+function gantiCustomer() {
+  document.getElementById('customerNo').value = '';
+  customerNamaTerpilih = '';
+  document.getElementById('customerSelectedTag').style.display = 'none';
+  document.getElementById('customerChips').style.display = 'flex';
+}
+
+function focusCustomerSearch() {
+  document.getElementById('customerSearchWrap').style.display = 'block';
+  document.getElementById('customerInput').focus();
+}
+
 let customerTimeout;
 document.getElementById('customerInput').addEventListener('input', function () {
   clearTimeout(customerTimeout);
@@ -75,28 +141,36 @@ document.getElementById('customerInput').addEventListener('input', function () {
         (data.hasil || []).forEach(c => {
           const div = document.createElement('div');
           div.textContent = c.namaCustomer + (c.skor < 100 ? ' (' + c.skor + '%)' : '');
-          div.onclick = () => {
-            document.getElementById('customerInput').value = c.namaCustomer;
-            document.getElementById('customerNo').value = c.kodeCustomer;
-            customerNamaTerpilih = c.namaCustomer;
-            box.innerHTML = '';
-          };
+          div.onclick = () => pilihCustomer(c);
           box.appendChild(div);
         });
       });
   }, 300);
 });
 
-// ---- Item rows ----
+// ================= ITEM =================
+
 function tambahItemRow() {
   const idx = items.length;
-  items.push({ namaBarang: '', qty: 1, hargaSatuan: 0 });
+  items.push({ namaBarang: '', namaTampil: '', qty: 1, hargaSatuan: 0 });
   const row = document.createElement('div');
   row.className = 'item-row';
   row.id = 'item-' + idx;
+
+  const chipsHtml = ITEM_CEPAT.map(it =>
+    '<button type="button" class="chip" onclick="pilihItemCepat(' + idx + ', \'' + it.query + '\')">' + it.label + '</button>'
+  ).join('');
+
   row.innerHTML = `
-    <span class="hapus" onclick="hapusItem(${idx})">✕ Hapus</span>
-    <div class="dropdown">
+    <div class="item-row-header">
+      <span class="item-title" id="itemTitle-${idx}">Barang #${idx + 1}</span>
+      <span class="hapus" onclick="hapusItem(${idx})">✕ Hapus</span>
+    </div>
+    <div class="quick-chips" id="itemChips-${idx}">
+      ${chipsHtml}
+      <button type="button" class="chip chip-lain" onclick="focusItemSearch(${idx})">Lainnya...</button>
+    </div>
+    <div class="dropdown" id="itemSearchWrap-${idx}" style="display:none">
       <input placeholder="Cari barang..." oninput="cariItemInput(${idx}, this.value)">
       <div class="options" id="itemOptions-${idx}"></div>
     </div>
@@ -106,6 +180,34 @@ function tambahItemRow() {
     </div>
   `;
   document.getElementById('itemList').appendChild(row);
+}
+
+function pilihItemCepat(idx, query) {
+  setStatus('Mencari ' + query + '...');
+  fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'cari_item_faktur_jual', query: query }) })
+    .then(r => r.json())
+    .then(data => {
+      setStatus('');
+      const hasil = data.hasil || [];
+      if (hasil.length === 0) { setStatus('Barang "' + query + '" tidak ketemu, coba cari manual.'); focusItemSearch(idx); return; }
+      pilihItemUntukRow(idx, hasil[0]);
+    })
+    .catch(() => { setStatus('Gagal cari barang, coba lagi.'); });
+}
+
+function pilihItemUntukRow(idx, it) {
+  items[idx].namaBarang = it.sku;
+  items[idx].namaTampil = it.nama;
+  document.getElementById('itemTitle-' + idx).textContent = it.nama;
+  document.getElementById('itemChips-' + idx).style.display = 'none';
+  document.getElementById('itemSearchWrap-' + idx).style.display = 'none';
+}
+
+function focusItemSearch(idx) {
+  document.getElementById('itemChips-' + idx).style.display = 'none';
+  const wrap = document.getElementById('itemSearchWrap-' + idx);
+  wrap.style.display = 'block';
+  wrap.querySelector('input').focus();
 }
 
 let itemTimeout;
@@ -121,11 +223,7 @@ function cariItemInput(idx, q) {
         (data.hasil || []).forEach(it => {
           const div = document.createElement('div');
           div.textContent = '[' + it.sku + '] ' + it.nama;
-          div.onclick = () => {
-            items[idx].namaBarang = it.sku;
-            box.parentElement.querySelector('input').value = it.nama;
-            box.innerHTML = '';
-          };
+          div.onclick = () => pilihItemUntukRow(idx, it);
           box.appendChild(div);
         });
       });
@@ -134,7 +232,8 @@ function cariItemInput(idx, q) {
 
 function hapusItem(idx) {
   items[idx] = null;
-  document.getElementById('item-' + idx).remove();
+  const row = document.getElementById('item-' + idx);
+  if (row) row.remove();
   hitungTotal();
 }
 
@@ -142,6 +241,8 @@ function hitungTotal() {
   const total = items.filter(Boolean).reduce((t, it) => t + (it.qty * it.hargaSatuan), 0);
   document.getElementById('totalNilai').textContent = 'Total: Rp ' + Math.round(total).toLocaleString('id-ID');
 }
+
+// ================= SUBMIT =================
 
 function submitFaktur() {
   const customerNo = document.getElementById('customerNo').value;
