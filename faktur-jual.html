@@ -43,10 +43,7 @@
 
 <label>Customer</label>
 <div class="quick-chips" id="customerChips">
-  <button type="button" class="chip" onclick="pilihCustomerCepat('Ibrahim')">Ibrahim</button>
-  <button type="button" class="chip" onclick="pilihCustomerCepat('Jessen')">Jessen</button>
-  <button type="button" class="chip" onclick="pilihCustomerCepat('Mangungsong')">Mangungsong</button>
-  <button type="button" class="chip chip-lain" onclick="focusCustomerSearch()">Lainnya...</button>
+  <!-- diisi otomatis oleh JS dari CUSTOMER_CEPAT -->
 </div>
 <div class="dropdown" id="customerSearchWrap" style="display:none">
   <input id="customerInput" placeholder="Ketik nama customer...">
@@ -84,31 +81,42 @@ const urlParams = new URLSearchParams(window.location.search);
 const chatIdDariUrl = urlParams.get('chatId');
 const chatId = chatIdDariUrl || (initData.user ? initData.user.id : null);
 
+// Customer yang paling sering dipakai — kode Accurate sudah pasti, jadi
+// langsung dipilih tanpa fetch ke server (lebih cepat & gak gampang gagal).
+const CUSTOMER_CEPAT = [
+  { label: 'Ibrahim', kode: 'C.00032', nama: 'IBRAHIM GROUP' },
+  { label: 'Jessen', kode: 'C.00030', nama: 'JESSEN' },
+  { label: 'Mangungsong', kode: 'C.00059', nama: 'MANGUNGSONG' }
+];
+
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
 let customerNamaTerpilih = '';
 let items = [];
 
-// Barang yang paling sering dipakai — tampil sebagai tombol cepat di tiap baris item
+// Barang yang paling sering dipakai — tampil sebagai tombol cepat di tiap baris item.
+// SKU & nama sudah pasti, jadi langsung dipilih tanpa fetch ke server (lebih cepat & gak gampang gagal).
 const ITEM_CEPAT = [
-  { label: 'GHKS-500PCS', query: 'GHKS-500PCS' },
-  { label: 'TMA-002', query: 'TMA-002' }
+  { label: 'GHKS-500PCS', sku: 'GHKS-500PCS', nama: 'GHKS-500PCS' },
+  { label: 'TMA-002', sku: 'TMA-002', nama: 'TMA-002' }
 ];
 
 document.getElementById('tanggal').valueAsDate = new Date();
 
 // ================= CUSTOMER =================
 
-function pilihCustomerCepat(nama) {
-  setStatus('Mencari ' + nama + '...');
-  fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'cari_customer_faktur_jual', query: nama }) })
-    .then(r => r.json())
-    .then(data => {
-      setStatus('');
-      const hasil = data.hasil || [];
-      if (hasil.length === 0) { setStatus('Customer "' + nama + '" tidak ketemu, coba cari manual.'); focusCustomerSearch(); return; }
-      pilihCustomer(hasil[0]);
-    })
-    .catch(() => { setStatus('Gagal cari customer, coba lagi.'); });
+function renderCustomerChips() {
+  const box = document.getElementById('customerChips');
+  const chipsHtml = CUSTOMER_CEPAT.map(c =>
+    '<button type="button" class="chip" onclick="pilihCustomerCepat(\'' + c.kode + '\')">' + c.label + '</button>'
+  ).join('');
+  box.innerHTML = chipsHtml + '<button type="button" class="chip chip-lain" onclick="focusCustomerSearch()">Lainnya...</button>';
+}
+renderCustomerChips();
+
+function pilihCustomerCepat(kode) {
+  const c = CUSTOMER_CEPAT.find(x => x.kode === kode);
+  if (!c) return;
+  pilihCustomer({ kodeCustomer: c.kode, namaCustomer: c.nama });
 }
 
 function pilihCustomer(c) {
@@ -165,7 +173,7 @@ function tambahItemRow() {
   row.id = 'item-' + idx;
 
   const chipsHtml = ITEM_CEPAT.map(it =>
-    '<button type="button" class="chip" onclick="pilihItemCepat(' + idx + ', \'' + it.query + '\')">' + it.label + '</button>'
+    '<button type="button" class="chip" onclick="pilihItemCepat(' + idx + ', \'' + it.sku + '\')">' + it.label + '</button>'
   ).join('');
 
   row.innerHTML = `
@@ -189,17 +197,10 @@ function tambahItemRow() {
   document.getElementById('itemList').appendChild(row);
 }
 
-function pilihItemCepat(idx, query) {
-  setStatus('Mencari ' + query + '...');
-  fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'cari_item_faktur_jual', query: query }) })
-    .then(r => r.json())
-    .then(data => {
-      setStatus('');
-      const hasil = data.hasil || [];
-      if (hasil.length === 0) { setStatus('Barang "' + query + '" tidak ketemu, coba cari manual.'); focusItemSearch(idx); return; }
-      pilihItemUntukRow(idx, hasil[0]);
-    })
-    .catch(() => { setStatus('Gagal cari barang, coba lagi.'); });
+function pilihItemCepat(idx, sku) {
+  const it = ITEM_CEPAT.find(x => x.sku === sku);
+  if (!it) return;
+  pilihItemUntukRow(idx, { sku: it.sku, nama: it.nama });
 }
 
 function pilihItemUntukRow(idx, it) {
