@@ -75,7 +75,14 @@
 const tg = window.Telegram.WebApp;
 tg.expand();
 const initData = tg.initDataUnsafe || {};
-const chatId = initData.user ? initData.user.id : null;
+
+// Ambil chatId dari URL param dulu (?chatId=123456) -- ini lebih stabil
+// daripada initDataUnsafe.user.id, yang suka kosong kalau mini app dibuka
+// dari Telegram Web (web.telegram.org). Fallback ke initDataUnsafe kalau
+// URL param-nya gak ada.
+const urlParams = new URLSearchParams(window.location.search);
+const chatIdDariUrl = urlParams.get('chatId');
+const chatId = chatIdDariUrl || (initData.user ? initData.user.id : null);
 
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
 let customerNamaTerpilih = '';
