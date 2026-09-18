@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Bayar Nota DIL - DKMS</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a1a; padding: 16px; padding-bottom: 40px; }
+  h1 { font-size: 20px; margin-bottom: 4px; color: #1a3a5c; }
+  .subtitle { font-size: 13px; color: #666; margin-bottom: 20px; }
+  .bank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .bank-card { background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 14px 10px; text-align: center; cursor: pointer; }
+  .bank-card.selected { border-color: #1a3a5c; background: #eaf1f8; }
+  .bank-card .name { font-weight: 600; font-size: 14px; }
+  .bank-card .no { font-size: 11px; color: #666; margin-top: 4px; }
+  .form-section { background: #fff; border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #333; margin-bottom: 6px; margin-top: 14px; }
+  label:first-child { margin-top: 0; }
+  input { width: 100%; padding: 12px; border: 1px solid #d0d0d0; border-radius: 8px; font-size: 16px; }
+  input:focus { outline: none; border-color: #1a3a5c; }
+  input[type=file] { padding: 8px; font-size: 13px; }
+  button.submit-btn { width: 100%; margin-top: 18px; padding: 14px; background: #1a3a5c; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  button.submit-btn:disabled { background: #a0a0a0; }
+  .result { display: none; margin-top: 16px; padding: 14px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
+  .result.success { display: block; background: #e6f7ec; color: #1e7e34; }
+  .result.error { display: block; background: #fdecea; color: #c0392b; }
+</style>
+</head>
+<body>
+
+  <h1>💳 Bayar Nota DIL (FIFO)</h1>
+  <div class="subtitle">Pembayaran hutang ke CV Dwikarya Inti Logam</div>
+
+  <div class="bank-grid">
+    <div class="bank-card selected" id="bank-bca" onclick="pilihBank('bca')">
+      <div class="name">🏦 BCA DKMS</div>
+      <div class="no">7285649676</div>
+    </div>
+    <div class="bank-card" id="bank-lkab" onclick="pilihBank('lkab')">
+      <div class="name">🏧 LKAB Mandiri</div>
+      <div class="no">1370026099925</div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <label for="tanggal">Tanggal Bayar</label>
+    <input type="date" id="tanggal">
+
+    <label for="nominal">Total Dibayar (Rp)</label>
+    <input type="number" id="nominal" inputmode="numeric">
+
+    <label for="fotoBukti">Foto Bukti Transfer (opsional)</label>
+    <input type="file" id="fotoBukti" accept="image/*" capture="environment">
+
+    <button class="submit-btn" id="submitBtn" onclick="submitBayar()">Catat & Push ke Accurate (FIFO)</button>
+  </div>
+
+  <div class="result" id="result"></div>
+
+<script>
+  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
+  const BANK = { bca: '110105', lkab: '110242' };
+
+  let bankTerpilih = 'bca';
+
+  const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+  if (tg) { tg.ready(); tg.expand(); }
+
+  const params = new URLSearchParams(window.location.search);
+  const chatId = params.get('chatId') || (tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '');
+  const namaAdmin = params.get('nama') || ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? [tg.initDataUnsafe.user.first_name, tg.initDataUnsafe.user.last_name].filter(Boolean).join(' ') : 'Admin');
+
+  document.getElementById('tanggal').valueAsDate = new Date();
+
+  function formatRp(n) { return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
+
+  function pilihBank(b) {
+    bankTerpilih = b;
+    document.getElementById('bank-bca').classList.toggle('selected', b === 'bca');
+    document.getElementById('bank-lkab').classList.toggle('selected', b === 'lkab');
+  }
+
+  function fileToBase64(file) {
+    return new Promise(function (resolve, reject) {
+      if (!file) return resolve(null);
+      const reader = new FileReader();
+      reader.onload = function () { resolve({ base64: reader.result.split(',')[1], mimeType: file.type }); };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function submitBayar() {
+    const nominal = parseFloat(document.getElementById('nominal').value);
+    const tanggal = document.getElementById('tanggal').value;
+    if (!nominal || nominal <= 0) return tampilkanHasil(false, 'Nominal belum valid.');
+    if (!tanggal) return tampilkanHasil(false, 'Tanggal belum diisi.');
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true; btn.textContent = 'Mengirim...';
+
+    try {
+      const fotoBuktiFile = document.getElementById('fotoBukti').files[0];
+      const fotoBukti = await fileToBase64(fotoBuktiFile);
+
+      const payload = {
+        action: 'bayar_nota_dil_fifo_app',
+        tanggal: tanggal,
+        nominal: nominal,
+        kodeAkunBank: BANK[bankTerpilih],
+        dicatatOleh: namaAdmin,
+        chatId: chatId
+      };
+      if (fotoBukti) { payload.base64ImageBukti = fotoBukti.base64; payload.mimeTypeBukti = fotoBukti.mimeType; }
+
+      const resp = await fetch(WEB_APP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      });
+      const json = await resp.json();
+      if (json.success) {
+        let msg = '✅ Pembayaran FIFO ke DIL berhasil!<br>';
+        msg += 'Nominal terpakai: ' + formatRp(json.nominalTerpakai) + '<br>';
+        if (json.sisaNominal > 0) msg += '⚠️ Sisa tidak terpakai: ' + formatRp(json.sisaNominal) + '<br>';
+        msg += 'No. Pembayaran: ' + json.noPembayaran + '<br>';
+        msg += 'Sisi DIL: ' + json.statusDIL + '<br>';
+        if (json.warningDIL) msg += '⚠️ ' + json.warningDIL + '<br>';
+        msg += '<br><b>Faktur dibayar:</b><br>';
+        (json.fakturDibayar || []).forEach(function (f) {
+          msg += f.invoiceNo + ' (' + f.tanggal + '): ' + formatRp(f.dibayar) + (f.lunas ? ' [LUNAS]' : ' [sisa ' + formatRp(f.sisaSesudah) + ']') + '<br>';
+        });
+        tampilkanHasil(true, msg);
+        if (tg) tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success');
+      } else {
+        tampilkanHasil(false, json.error || 'Gagal mencatat pembayaran.');
+      }
+    } catch (err) {
+      tampilkanHasil(false, 'Gagal terhubung ke server: ' + err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Catat & Push ke Accurate (FIFO)';
+    }
+  }
+
+  function tampilkanHasil(sukses, html) {
+    const el = document.getElementById('result');
+    el.className = 'result ' + (sukses ? 'success' : 'error');
+    el.innerHTML = html;
+  }
+</script>
+</body>
+</html>
