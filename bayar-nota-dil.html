@@ -3,19 +3,38 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Bayar Nota DIL - DKMS</title>
+<title>Bayar Faktur - DKMS</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a1a; padding: 16px; padding-bottom: 40px; }
   h1 { font-size: 20px; margin-bottom: 4px; color: #1a3a5c; }
   .subtitle { font-size: 13px; color: #666; margin-bottom: 20px; }
-  .bank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-  .bank-card { background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 16px 10px; text-align: center; cursor: pointer; }
+  .quick-label { font-size: 12px; color: #666; margin-bottom: 8px; font-weight: 600; }
+  .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .quick-card { background: #fff; border: 2px solid #e0e0e0; border-radius: 10px; padding: 10px 8px; text-align: center; cursor: pointer; }
+  .quick-card:active { border-color: #1a3a5c; background: #eaf1f8; }
+  .quick-card .nama { font-weight: 600; font-size: 12.5px; line-height: 1.3; }
+  .search-box { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .search-box .label { font-size: 12px; color: #888; margin-bottom: 8px; }
+  input.search { width: 100%; padding: 12px; border: 1px solid #d0d0d0; border-radius: 8px; font-size: 16px; }
+  input.search:focus { outline: none; border-color: #1a3a5c; }
+  .hasil-list { margin-top: 10px; }
+  .hasil-item { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; }
+  .hasil-item:active { background: #eaf1f8; }
+  .hasil-item .nama { font-weight: 600; font-size: 14px; }
+  .hasil-item .kode { font-size: 11px; color: #888; margin-top: 2px; }
+  .loading-text, .empty-text { font-size: 13px; color: #888; padding: 8px 4px; }
+  .selected-supplier { background: #eaf1f8; border: 2px solid #1a3a5c; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .selected-supplier .nama { font-weight: 600; font-size: 14px; }
+  .ganti-btn { font-size: 12px; color: #1a3a5c; text-decoration: underline; background: none; border: none; cursor: pointer; }
+  .bank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .bank-card { background: #fff; border: 2px solid #e0e0e0; border-radius: 12px; padding: 14px 10px; text-align: center; cursor: pointer; }
   .bank-card.selected { border-color: #1a3a5c; background: #eaf1f8; }
   .bank-card .name { font-weight: 600; font-size: 14px; }
   .bank-card .no { font-size: 11px; color: #666; margin-top: 4px; }
-  .form-section { background: #fff; border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .form-section { display: none; background: #fff; border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .form-section.active { display: block; }
   label { display: block; font-size: 13px; font-weight: 600; color: #333; margin-bottom: 6px; margin-top: 14px; }
   label:first-child { margin-top: 0; }
   input { width: 100%; padding: 12px; border: 1px solid #d0d0d0; border-radius: 8px; font-size: 16px; }
@@ -25,43 +44,78 @@
   .result { display: none; margin-top: 16px; padding: 14px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
   .result.success { display: block; background: #e6f7ec; color: #1e7e34; }
   .result.error { display: block; background: #fdecea; color: #c0392b; }
-  .faktur-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
 </style>
 </head>
 <body>
 
-  <h1>💳 Bayar Nota ke DIL (FIFO)</h1>
+  <h1>💳 Bayar Faktur (FIFO)</h1>
   <div class="subtitle">CV Dwi Karya Makmur Sejahtera</div>
 
-  <div class="bank-grid">
-    <div class="bank-card selected" id="bank-bca" onclick="pilihBank('bca')">
-      <div class="name">🏦 BCA DKMS</div>
-      <div class="no">7285649676</div>
+  <div id="searchSection">
+    <div class="quick-label">Supplier sering dibayar — tap buat pilih cepat</div>
+    <div class="quick-grid" id="quickPickSupplier"></div>
+
+    <div class="search-box">
+      <div class="label">Atau cari supplier lain...</div>
+      <input type="text" class="search" id="searchInput" placeholder="Ketik nama supplier..." autocomplete="off">
     </div>
-    <div class="bank-card" id="bank-lkab" onclick="pilihBank('lkab')">
-      <div class="name">🏧 LKAB Mandiri</div>
-      <div class="no">1370026099925</div>
-    </div>
+    <div class="hasil-list" id="hasilList"></div>
   </div>
 
-  <div class="form-section">
-    <label for="tanggal">Tanggal Bayar</label>
-    <input type="date" id="tanggal">
+  <div id="selectedSection" style="display:none;">
+    <div class="selected-supplier">
+      <span class="nama" id="namaSupplierTerpilih"></span>
+      <button class="ganti-btn" onclick="gantiSupplier()">Ganti</button>
+    </div>
 
-    <label for="nominal">Total Dibayar (Rp)</label>
-    <input type="number" id="nominal" inputmode="numeric" placeholder="Total transfer ke DIL">
+    <div class="bank-grid">
+      <div class="bank-card selected" id="bank-bca" onclick="pilihBank('bca')">
+        <div class="name">🏦 BCA DKMS</div>
+        <div class="no">7285649676</div>
+      </div>
+      <div class="bank-card" id="bank-lkab" onclick="pilihBank('lkab')">
+        <div class="name">🏧 LKAB Mandiri</div>
+        <div class="no">1370026099925</div>
+      </div>
+    </div>
 
-    <button class="submit-btn" id="submitBtn" onclick="submitBayar()">Catat & Push ke Accurate (FIFO)</button>
+    <div class="form-section active">
+      <label for="tanggal">Tanggal Bayar</label>
+      <input type="date" id="tanggal">
+
+      <label for="nominal">Total Dibayar (Rp)</label>
+      <input type="number" id="nominal" inputmode="numeric">
+
+      <button class="submit-btn" id="submitBtn" onclick="submitBayar()">Catat & Push ke Accurate (FIFO)</button>
+    </div>
   </div>
 
   <div class="result" id="result"></div>
 
 <script>
-  // GANTI dengan Web App URL project Apps Script DKMS (yang sama dipakai catat-beban.html versi DKMS)
   const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
-
   const BANK = { bca: '110105', lkab: '110242' };
+
+  // Supplier sering dibayar — hardcode kode vendor biar tap langsung pilih,
+  // nggak nunggu fetch ke server tiap buka mini app.
+  const SUPPLIER_QUICK = [
+    { namaSupplier: 'SHENAR', kodeVendor: 'V.00112' },
+    { namaSupplier: 'PT AYYUBI BERKAH NUSANTARA', kodeVendor: 'V.00060' },
+    { namaSupplier: 'Widanaesya Grosir', kodeVendor: 'V.00116' },
+    { namaSupplier: 'Lia Textile', kodeVendor: 'V.00065' },
+    { namaSupplier: 'MJS', kodeVendor: 'DZS-004' },
+    { namaSupplier: 'ANANTA GROSIR', kodeVendor: 'V.00091' },
+    { namaSupplier: 'BERKAH HOKI', kodeVendor: 'DZS-007' },
+    { namaSupplier: 'H&P Perabot Herman', kodeVendor: 'V.00052' },
+    { namaSupplier: 'PONCO', kodeVendor: 'V.00167' },
+    { namaSupplier: 'IBRAHIM GROUP', kodeVendor: 'DZS-002' },
+    { namaSupplier: 'BINTANG GROSIR', kodeVendor: 'DZS-006' },
+    { namaSupplier: 'ALI STORE BEKASI', kodeVendor: 'V.00166' }
+  ];
+
   let bankTerpilih = 'bca';
+  let supplierTerpilih = null; // { namaSupplier, kodeVendor }
+  let debounceTimer = null;
 
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   if (tg) { tg.ready(); tg.expand(); }
@@ -72,15 +126,83 @@
 
   document.getElementById('tanggal').valueAsDate = new Date();
 
+  function formatRp(n) { return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
+
+  // Render quick-pick (instan, tanpa fetch)
+  (function renderQuickPickSupplier() {
+    const el = document.getElementById('quickPickSupplier');
+    el.innerHTML = '';
+    SUPPLIER_QUICK.forEach(function (s) {
+      const d = document.createElement('div');
+      d.className = 'quick-card';
+      d.innerHTML = '<div class="nama">' + s.namaSupplier + '</div>';
+      d.onclick = function () { pilihSupplier(s); };
+      el.appendChild(d);
+    });
+  })();
+
+  document.getElementById('searchInput').addEventListener('input', function (e) {
+    const query = e.target.value.trim();
+    clearTimeout(debounceTimer);
+    if (query.length < 2) {
+      document.getElementById('hasilList').innerHTML = '';
+      return;
+    }
+    document.getElementById('hasilList').innerHTML = '<div class="loading-text">Mencari...</div>';
+    debounceTimer = setTimeout(function () { cariSupplier(query); }, 350);
+  });
+
+  async function cariSupplier(query) {
+    try {
+      const resp = await fetch(WEB_APP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'cari_supplier_faktur_app', query: query })
+      });
+      const json = await resp.json();
+      const list = document.getElementById('hasilList');
+      if (!json.success || !json.hasil || json.hasil.length === 0) {
+        list.innerHTML = '<div class="empty-text">Nggak ketemu supplier dengan nama itu.</div>';
+        return;
+      }
+      list.innerHTML = '';
+      json.hasil.forEach(function (s) {
+        const div = document.createElement('div');
+        div.className = 'hasil-item';
+        div.innerHTML = '<div class="nama">' + s.namaSupplier + '</div><div class="kode">' + s.kodeVendor + '</div>';
+        div.onclick = function () { pilihSupplier(s); };
+        list.appendChild(div);
+      });
+    } catch (err) {
+      document.getElementById('hasilList').innerHTML = '<div class="empty-text">Gagal cari: ' + err.message + '</div>';
+    }
+  }
+
+  function pilihSupplier(s) {
+    supplierTerpilih = s;
+    document.getElementById('namaSupplierTerpilih').textContent = s.namaSupplier;
+    document.getElementById('searchSection').style.display = 'none';
+    document.getElementById('selectedSection').style.display = 'block';
+  }
+
+  function gantiSupplier() {
+    supplierTerpilih = null;
+    document.getElementById('searchSection').style.display = 'block';
+    document.getElementById('selectedSection').style.display = 'none';
+    document.getElementById('searchInput').value = '';
+    document.getElementById('hasilList').innerHTML = '';
+    document.getElementById('result').className = 'result';
+    document.getElementById('result').innerHTML = '';
+  }
+
   function pilihBank(b) {
     bankTerpilih = b;
     document.getElementById('bank-bca').classList.toggle('selected', b === 'bca');
     document.getElementById('bank-lkab').classList.toggle('selected', b === 'lkab');
   }
 
-  function formatRp(n) { return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
-
   async function submitBayar() {
+    if (!supplierTerpilih) return;
     const nominal = parseFloat(document.getElementById('nominal').value);
     const tanggal = document.getElementById('tanggal').value;
     if (!nominal || nominal <= 0) return tampilkanHasil(false, 'Nominal belum valid.');
@@ -94,25 +216,25 @@
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({
-          action: 'bayar_nota_dil_fifo_app',
+          action: 'bayar_faktur_fifo_app',
+          vendorNo: supplierTerpilih.kodeVendor,
+          namaSupplier: supplierTerpilih.namaSupplier,
           tanggal: tanggal,
           nominal: nominal,
           kodeAkunBank: BANK[bankTerpilih],
           dicatatOleh: namaAdmin,
           chatId: chatId
-       })
+        })
       });
       const json = await resp.json();
       if (json.success) {
-        let msg = '✅ Pembayaran FIFO ke DIL berhasil!<br>';
+        let msg = '✅ Pembayaran FIFO ke ' + json.namaSupplier + ' berhasil!<br>';
         msg += 'Nominal terpakai: ' + formatRp(json.nominalTerpakai) + '<br>';
         if (json.sisaNominal > 0) msg += '⚠️ Sisa tidak terpakai: ' + formatRp(json.sisaNominal) + '<br>';
         msg += 'No. Pembayaran: ' + json.noPembayaran + '<br><br><b>Faktur dibayar:</b><br>';
-        (json.fakturDibayar || []).forEach(function(f) {
+        (json.fakturDibayar || []).forEach(function (f) {
           msg += f.invoiceNo + ' (' + f.tanggal + '): ' + formatRp(f.dibayar) + (f.lunas ? ' [LUNAS]' : ' [sisa ' + formatRp(f.sisaSesudah) + ']') + '<br>';
         });
-        msg += '<br>Status DIL: ' + json.statusDIL;
-        if (json.warningDIL) msg += '<br>⚠️ ' + json.warningDIL;
         tampilkanHasil(true, msg);
         if (tg) tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success');
       } else {
