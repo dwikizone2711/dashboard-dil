@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Beli Bahan Packing - DKMS</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a1a; padding: 16px; padding-bottom: 40px; }
+  h1 { font-size: 20px; margin-bottom: 4px; color: #1a3a5c; }
+  .subtitle { font-size: 13px; color: #666; margin-bottom: 16px; }
+  .card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 14px; color: #1a3a5c; margin-bottom: 12px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #333; margin-bottom: 6px; margin-top: 12px; }
+  label:first-child { margin-top: 0; }
+  input { width: 100%; padding: 11px; border: 1px solid #d0d0d0; border-radius: 8px; font-size: 15px; }
+  input:focus { outline: none; border-color: #1a3a5c; }
+  input[type=file] { padding: 8px; font-size: 13px; }
+
+  .warn-box { background: #fff8e6; border: 1px solid #f0c36d; border-radius: 10px; padding: 11px 13px; font-size: 12.5px; color: #8a6d1f; line-height: 1.5; margin-bottom: 14px; }
+
+  .item-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .item-card { background: #f7f9fb; border: 2px solid #e0e0e0; border-radius: 12px; padding: 12px 8px; text-align: center; cursor: pointer; }
+  .item-card.selected { border-color: #1a3a5c; background: #eaf1f8; }
+  .item-card .nama { font-weight: 600; font-size: 12.5px; line-height: 1.3; }
+  .item-card .kode { font-size: 10.5px; color: #888; margin-top: 4px; }
+  .empty-text { font-size: 13px; color: #888; grid-column: 1 / -1; }
+
+  .search-wrap { position: relative; margin-top: 10px; }
+  .hasil-list { margin-top: 6px; }
+  .hasil-item { background: #f7f9fb; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; cursor: pointer; font-size: 13px; }
+  .hasil-item .kode { font-size: 11px; color: #888; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; background: #eaf1f8; border: 1px solid #1a3a5c; border-radius: 20px; padding: 6px 12px; font-size: 13px; font-weight: 600; margin-top: 10px; }
+  .chip .x { cursor: pointer; color: #c0392b; font-weight: 700; }
+
+  .brg { border: 1px solid #e0e0e0; border-radius: 10px; padding: 11px; margin-bottom: 10px; }
+  .brg.isi { border-color: #1a3a5c; background: #fafcff; }
+  .brg-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .brg-head .nm { font-weight: 700; font-size: 14px; }
+  .brg-head .sat { font-size: 11.5px; color: #888; }
+  .satpilih { display: inline-flex; border: 1px solid #d0d0d0; border-radius: 14px; overflow: hidden; }
+  .satbtn { padding: 3px 11px; font-size: 11.5px; color: #666; cursor: pointer; background: #fff; }
+  .satbtn.aktif { background: #1a3a5c; color: #fff; font-weight: 600; }
+  .brg-inputs { display: grid; grid-template-columns: 1fr 1.2fr; gap: 8px; }
+  .brg-inputs label { margin-top: 0; font-size: 11.5px; color: #666; }
+  .brg-sub { text-align: right; font-size: 12.5px; color: #1a3a5c; font-weight: 600; margin-top: 7px; min-height: 17px; }
+  .total-row { display: flex; justify-content: space-between; font-size: 16px; font-weight: 700; margin-top: 12px; padding-top: 10px; border-top: 1px solid #ddd; }
+
+  .toggle-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+  .toggle-btn { padding: 12px; text-align: center; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .toggle-btn.selected { border-color: #1a3a5c; background: #eaf1f8; }
+  .bank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .bank-card { border: 2px solid #e0e0e0; border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; font-size: 13px; }
+  .bank-card.selected { border-color: #1a3a5c; background: #eaf1f8; }
+  #pembayaranDetail { display: none; margin-top: 10px; }
+  #pembayaranDetail.active { display: block; }
+
+  button.submit-btn { width: 100%; margin-top: 6px; padding: 14px; background: #1a3a5c; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  button.submit-btn:disabled { background: #a0a0a0; }
+  .result { display: none; margin-top: 16px; padding: 14px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
+  .result.success { display: block; background: #e6f7ec; color: #1e7e34; }
+  .result.error { display: block; background: #fdecea; color: #c0392b; }
+</style>
+</head>
+<body>
+
+  <h1>📦 Beli Bahan Packing</h1>
+  <div class="subtitle">CV Dwi Karya Makmur Sejahtera</div>
+
+  <div class="warn-box">
+    ⚠️ Form ini <b>khusus nota yang isinya cuma bahan packing</b> (bubble, lakban, thermal, plastik).<br>
+    Kalau di nota ini ada barang lain (misal beli lakban sekalian tikar mercy di Ali Store), <b>jangan pakai form ini</b> — input lewat mini app <b>Nota Pembelian</b> biasa, supaya 1 nota = 1 faktur dan nilainya cocok sama tagihan supplier.
+  </div>
+
+  <div class="card">
+    <h2>Info Nota</h2>
+    <label>Tanggal</label>
+    <input type="date" id="tanggal">
+
+    <label>Supplier</label>
+    <div class="item-grid" id="supplierCards"></div>
+    <div class="search-wrap">
+      <input type="text" id="supplierSearch" placeholder="Atau cari supplier lain..." autocomplete="off">
+      <div class="hasil-list" id="supplierHasil"></div>
+    </div>
+    <div id="supplierChip"></div>
+
+    <label>No. Nota (opsional)</label>
+    <input type="text" id="nomorNota" placeholder="Kosongin kalau nggak ada">
+
+    <label>Foto Nota (opsional)</label>
+    <input type="file" id="fotoNota" accept="image/*" capture="environment">
+  </div>
+
+  <div class="card">
+    <h2>Barang — isi yang dibeli aja, sisanya kosongin</h2>
+    <div id="barangList"></div>
+    <div class="total-row"><span>Total</span><span id="totalDisplay">Rp 0</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Pembayaran</h2>
+    <div class="toggle-row">
+      <div class="toggle-btn selected" id="toggle-tempo" onclick="pilihTipeBayar('tempo')">Tempo</div>
+      <div class="toggle-btn" id="toggle-cash" onclick="pilihTipeBayar('cash')">Cash / DP</div>
+    </div>
+    <div id="pembayaranDetail">
+      <label>Nominal Dibayar (Rp)</label>
+      <input type="number" id="nominalBayar" inputmode="numeric">
+
+      <label>Bank</label>
+      <div class="bank-grid">
+        <div class="bank-card selected" id="bank-bca" onclick="pilihBank('bca')">🏦 BCA DKMS</div>
+        <div class="bank-card" id="bank-lkab" onclick="pilihBank('lkab')">🏧 LKAB Mandiri</div>
+      </div>
+
+      <label>Tanggal Bayar</label>
+      <input type="date" id="tanggalBayar">
+
+      <label>Foto Bukti Transfer (opsional)</label>
+      <input type="file" id="fotoBukti" accept="image/*" capture="environment">
+    </div>
+  </div>
+
+  <button class="submit-btn" id="submitBtn" onclick="submitNota()">Simpan Nota</button>
+
+  <div class="result" id="result"></div>
+
+<script>
+  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
+  const BANK = { bca: '110105', lkab: '110242' };
+
+  // 4 bahan packing (SKU sama dengan item di Accurate)
+  const BARANG = [
+    { kunci: 'bubble',  sku: '100030',  nama: 'Bubble',  satuan: 'Roll' },
+    { kunci: 'lakban',  sku: 'LSI-002', nama: 'Lakban',  satuan: 'PCS', besar: { nama: 'Koli', isi: 72 } },
+    { kunci: 'thermal', sku: '100042',  nama: 'Thermal', satuan: 'PCS' },
+    { kunci: 'plastik', sku: '100031',  nama: 'Plastik', satuan: 'KG',  besar: { nama: 'Bal', isi: 25 } }
+  ];
+
+  // Supplier bahan packing. kodeVendor yang sudah diketahui diisi langsung;
+  // yang null dicari otomatis di Accurate waktu di-tap.
+  const SUPPLIER = [
+    { namaSupplier: 'BERKAH PLASTIK CV', cari: 'berkah plastik', kodeVendor: 'DZS-012' },
+    { namaSupplier: 'ALI STORE BEKASI',  cari: 'ali store',      kodeVendor: 'V.00166' },
+    { namaSupplier: 'MJS',               cari: 'mjs',            kodeVendor: 'DZS-004' },
+    { namaSupplier: 'H&P Perabot Herman',cari: 'herman',         kodeVendor: 'V.00052' },
+    { namaSupplier: 'RINDU BRENDIS',     cari: 'rindu',          kodeVendor: 'DZS-003' },
+    { namaSupplier: 'EKATAPE',           cari: 'ekatape',        kodeVendor: 'V.00115' },
+    { namaSupplier: 'Ahmad bubble',      cari: 'ahmad bubble',   kodeVendor: 'V.00113' },
+    { namaSupplier: 'PORISPACK',         cari: 'porispack',      kodeVendor: null },
+    { namaSupplier: 'MITRANPACK',        cari: 'mitranpack',     kodeVendor: null }
+  ];
+
+
+  let supplierTerpilih = null;
+  let bankTerpilih = 'bca';
+  let tipeBayar = 'tempo';
+  const isian = {};           // kunci -> { qty, harga } dalam SATUAN DASAR (yang dikirim ke Accurate)
+  const satuanDipakai = {};   // kunci -> 'kecil' | 'besar'
+  let supplierFetchController = null;
+
+  const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+  if (tg) { tg.ready(); tg.expand(); }
+  const params = new URLSearchParams(window.location.search);
+  const chatId = params.get('chatId') || (tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '');
+  const namaAdmin = params.get('nama') || ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? [tg.initDataUnsafe.user.first_name, tg.initDataUnsafe.user.last_name].filter(Boolean).join(' ') : 'Admin');
+
+  document.getElementById('tanggal').valueAsDate = new Date();
+  document.getElementById('tanggalBayar').valueAsDate = new Date();
+  renderSupplier();
+  renderBarang();
+
+  function formatRp(n) { return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  // ---------- Supplier ----------
+  function renderSupplier() {
+    const el = document.getElementById('supplierCards');
+    el.innerHTML = '';
+    SUPPLIER.forEach(function (s, i) {
+      const d = document.createElement('div');
+      d.className = 'item-card';
+      d.id = 'sup-' + i;
+      d.innerHTML = '<div class="nama">' + esc(s.namaSupplier) + '</div><div class="kode">' + esc(s.kodeVendor || 'bahan packing') + '</div>';
+      d.onclick = function () { tapSupplier(i); };
+      el.appendChild(d);
+    });
+  }
+
+  async function tapSupplier(i) {
+    const s = SUPPLIER[i];
+    if (s.kodeVendor) return pilihSupplier({ namaSupplier: s.namaSupplier, kodeVendor: s.kodeVendor });
+    const kartu = document.getElementById('sup-' + i);
+    kartu.querySelector('.kode').textContent = 'mencari...';
+    try {
+      const json = await panggil({ action: 'cari_supplier_nota_app', query: s.cari });
+      const hasil = (json && json.success && json.hasil) ? json.hasil : [];
+      if (!hasil.length) {
+        kartu.querySelector('.kode').textContent = 'tidak ketemu';
+        return tampilkanHasil(false, 'Supplier "' + s.namaSupplier + '" nggak ketemu di Accurate. Cari manual di kolom pencarian, atau bikin dulu suppliernya di Accurate.');
+      }
+      if (hasil.length === 1) {
+        s.kodeVendor = hasil[0].kodeVendor;
+        kartu.querySelector('.kode').textContent = s.kodeVendor;
+        return pilihSupplier(hasil[0]);
+      }
+      kartu.querySelector('.kode').textContent = 'pilih di bawah';
+      tampilkanPilihanSupplier(hasil);
+    } catch (err) {
+      kartu.querySelector('.kode').textContent = 'gagal';
+      tampilkanHasil(false, 'Gagal cari supplier: ' + err.message);
+    }
+  }
+
+  function tampilkanPilihanSupplier(hasil) {
+    const el = document.getElementById('supplierHasil');
+    el.innerHTML = '';
+    hasil.forEach(function (s) {
+      const d = document.createElement('div');
+      d.className = 'hasil-item';
+      d.innerHTML = esc(s.namaSupplier) + '<div class="kode">' + esc(s.kodeVendor) + '</div>';
+      d.onclick = function () { pilihSupplier(s); };
+      el.appendChild(d);
+    });
+  }
+
+  document.getElementById('supplierSearch').addEventListener('input', async function (e) {
+    const q = e.target.value.trim();
+    const el = document.getElementById('supplierHasil');
+    if (q.length < 2) { el.innerHTML = ''; return; }
+    if (supplierFetchController) supplierFetchController.abort();
+    const controller = new AbortController();
+    supplierFetchController = controller;
+    try {
+      const json = await panggil({ action: 'cari_supplier_nota_app', query: q }, controller.signal);
+      if (!json.success) { el.innerHTML = '<div class="hasil-item">⚠️ Error: ' + esc(json.error || 'nggak diketahui') + '</div>'; return; }
+      if (!json.hasil || !json.hasil.length) { el.innerHTML = '<div class="hasil-item">Nggak ketemu.</div>'; return; }
+      tampilkanPilihanSupplier(json.hasil);
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      el.innerHTML = '<div class="hasil-item">⚠️ Gagal terhubung: ' + esc(err.message) + '</div>';
+    }
+  });
+
+  function pilihSupplier(s) {
+    supplierTerpilih = s;
+    document.getElementById('supplierCards').style.display = 'none';
+    document.getElementById('supplierSearch').style.display = 'none';
+    document.getElementById('supplierHasil').innerHTML = '';
+    document.getElementById('supplierChip').innerHTML = '<div class="chip">' + esc(s.namaSupplier) + ' <span class="x" onclick="gantiSupplier()">✕</span></div>';
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+  }
+  function gantiSupplier() {
+    supplierTerpilih = null;
+    document.getElementById('supplierCards').style.display = 'grid';
+    document.getElementById('supplierSearch').style.display = 'block';
+    document.getElementById('supplierSearch').value = '';
+    document.getElementById('supplierChip').innerHTML = '';
+  }
+
+  // ---------- Barang ----------
+  function renderBarang() {
+    const el = document.getElementById('barangList');
+    el.innerHTML = '';
+    BARANG.forEach(function (b) {
+      isian[b.kunci] = { qty: 0, harga: 0 };
+      satuanDipakai[b.kunci] = 'kecil';
+      const d = document.createElement('div');
+      d.className = 'brg';
+      d.id = 'brg-' + b.kunci;
+      let satuanHtml = '<span class="sat">' + esc(b.sku) + ' &middot; ' + esc(b.satuan) + '</span>';
+      if (b.besar) {
+        satuanHtml = '<span class="satpilih">' +
+          '<span class="satbtn aktif" id="sat-' + b.kunci + '-kecil" onclick="pilihSatuan(\'' + b.kunci + '\', \'kecil\')">' + esc(b.satuan) + '</span>' +
+          '<span class="satbtn" id="sat-' + b.kunci + '-besar" onclick="pilihSatuan(\'' + b.kunci + '\', \'besar\')">' + esc(b.besar.nama) + '</span>' +
+          '</span>';
+      }
+      d.innerHTML =
+        '<div class="brg-head"><span class="nm">' + esc(b.nama) + ' =</span>' + satuanHtml + '</div>' +
+        '<div class="brg-inputs">' +
+          '<div><label id="lq-' + b.kunci + '">Qty (' + esc(b.satuan) + ')</label><input type="number" inputmode="decimal" id="qty-' + b.kunci + '" placeholder="0"></div>' +
+          '<div><label id="lh-' + b.kunci + '">Harga per ' + esc(b.satuan) + '</label><input type="number" inputmode="numeric" id="hrg-' + b.kunci + '" placeholder="0"></div>' +
+        '</div>' +
+        '<div class="brg-sub" id="sub-' + b.kunci + '"></div>';
+      el.appendChild(d);
+      d.querySelector('#qty-' + b.kunci).addEventListener('input', function () { ubahBarang(b.kunci); });
+      d.querySelector('#hrg-' + b.kunci).addEventListener('input', function () { ubahBarang(b.kunci); });
+    });
+  }
+
+  function pilihSatuan(kunci, mode) {
+    const b = BARANG.filter(function (x) { return x.kunci === kunci; })[0];
+    if (!b || !b.besar) return;
+    satuanDipakai[kunci] = mode;
+    const label = mode === 'besar' ? b.besar.nama : b.satuan;
+    document.getElementById('sat-' + kunci + '-kecil').classList.toggle('aktif', mode === 'kecil');
+    document.getElementById('sat-' + kunci + '-besar').classList.toggle('aktif', mode === 'besar');
+    document.getElementById('lq-' + kunci).textContent = 'Qty (' + label + ')';
+    document.getElementById('lh-' + kunci).textContent = 'Harga per ' + label;
+    ubahBarang(kunci);
+  }
+
+  function ubahBarang(kunci) {
+    const b = BARANG.filter(function (x) { return x.kunci === kunci; })[0];
+    const qtyInput = parseFloat(String(document.getElementById('qty-' + kunci).value).replace(',', '.')) || 0;
+    const hargaInput = parseFloat(String(document.getElementById('hrg-' + kunci).value).replace(',', '.')) || 0;
+    const pakaiBesar = b.besar && satuanDipakai[kunci] === 'besar';
+    const rasio = pakaiBesar ? b.besar.isi : 1;
+    // yang dikirim ke Accurate selalu satuan dasar (PCS / KG / Roll)
+    const qty = Math.round(qtyInput * rasio * 1000) / 1000;
+    const harga = rasio > 1 ? (hargaInput / rasio) : hargaInput;
+    isian[kunci] = { qty: qty, harga: harga };
+    document.getElementById('brg-' + kunci).classList.toggle('isi', qty > 0);
+    let teks = '';
+    if (qty > 0) {
+      teks = formatRp(qtyInput * hargaInput);
+      if (pakaiBesar) teks += ' — ke Accurate: ' + qty + ' ' + b.satuan + ' @ ' + formatRp(harga);
+    }
+    document.getElementById('sub-' + kunci).textContent = teks;
+    hitungTotal();
+  }
+
+  function hitungTotal() {
+    let total = 0;
+    BARANG.forEach(function (b) { const x = isian[b.kunci]; if (x.qty > 0) total += x.qty * x.harga; });
+    document.getElementById('totalDisplay').textContent = formatRp(total);
+    const nb = document.getElementById('nominalBayar');
+    if (tipeBayar === 'cash' && !nb.dataset.touched) nb.value = total;
+    return total;
+  }
+  document.getElementById('nominalBayar').addEventListener('input', function () { this.dataset.touched = '1'; });
+
+  // ---------- Pembayaran ----------
+  function pilihTipeBayar(t) {
+    tipeBayar = t;
+    document.getElementById('toggle-tempo').classList.toggle('selected', t === 'tempo');
+    document.getElementById('toggle-cash').classList.toggle('selected', t === 'cash');
+    document.getElementById('pembayaranDetail').classList.toggle('active', t === 'cash');
+    if (t === 'cash') hitungTotal();
+  }
+  function pilihBank(b) {
+    bankTerpilih = b;
+    document.getElementById('bank-bca').classList.toggle('selected', b === 'bca');
+    document.getElementById('bank-lkab').classList.toggle('selected', b === 'lkab');
+  }
+
+  // ---------- Util ----------
+  function fileToBase64(file) {
+    return new Promise(function (resolve, reject) {
+      if (!file) return resolve(null);
+      const reader = new FileReader();
+      reader.onload = function () { resolve({ base64: reader.result.split(',')[1], mimeType: file.type }); };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function panggil(payload, signal, percobaanKe) {
+    percobaanKe = percobaanKe || 1;
+    const opsi = { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) };
+    if (signal) opsi.signal = signal;
+    const resp = await fetch(WEB_APP_URL, opsi);
+    const text = await resp.text();
+    try { return JSON.parse(text); }
+    catch (e) {
+      if (percobaanKe < 2) return panggil(payload, signal, percobaanKe + 1);
+      throw new Error('Server ngasih balikan aneh (bukan JSON), coba lagi sebentar.');
+    }
+  }
+
+  // ---------- Submit ----------
+  async function submitNota() {
+    if (!supplierTerpilih) return tampilkanHasil(false, 'Supplier belum dipilih.');
+    const tanggal = document.getElementById('tanggal').value;
+    if (!tanggal) return tampilkanHasil(false, 'Tanggal belum diisi.');
+
+    const itemList = [];
+    const tanpaHarga = [];
+    BARANG.forEach(function (b) {
+      const x = isian[b.kunci];
+      if (!(x.qty > 0)) return;               // kosong = nggak dipush ke Accurate
+      if (!(x.harga > 0)) tanpaHarga.push(b.nama);
+      itemList.push({ namaBarang: b.sku, qty: x.qty, hargaSatuan: x.harga });
+    });
+    if (!itemList.length) return tampilkanHasil(false, 'Belum ada barang yang diisi. Isi minimal 1 barang (qty > 0).');
+    if (tanpaHarga.length) return tampilkanHasil(false, 'Harga satuan belum diisi untuk: ' + tanpaHarga.join(', ') + '.');
+
+    const total = hitungTotal();
+    if (tipeBayar === 'cash') {
+      const bayar = parseFloat(document.getElementById('nominalBayar').value) || 0;
+      if (bayar <= 0) return tampilkanHasil(false, 'Nominal bayar belum diisi.');
+      if (bayar > total) return tampilkanHasil(false, 'Nominal bayar (' + formatRp(bayar) + ') lebih besar dari total nota (' + formatRp(total) + ').');
+    }
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+
+    try {
+      const fotoNota = await fileToBase64(document.getElementById('fotoNota').files[0]);
+      const fotoBukti = tipeBayar === 'cash' ? await fileToBase64(document.getElementById('fotoBukti').files[0]) : null;
+
+      const payload = {
+        action: 'proses_nota_lengkap_app',
+        vendorNo: supplierTerpilih.kodeVendor,
+        namaSupplier: supplierTerpilih.namaSupplier,
+        tanggal: tanggal,
+        nomorNota: document.getElementById('nomorNota').value || null,
+        items: itemList,
+        dicatatOleh: namaAdmin,
+        chatId: chatId
+      };
+      if (fotoNota) { payload.base64ImageNota = fotoNota.base64; payload.mimeTypeNota = fotoNota.mimeType; }
+      if (tipeBayar === 'cash') {
+        payload.nominalBayar = parseFloat(document.getElementById('nominalBayar').value) || 0;
+        payload.kodeAkunBankBayar = BANK[bankTerpilih];
+        payload.tanggalBayar = document.getElementById('tanggalBayar').value || tanggal;
+        if (fotoBukti) { payload.base64ImageBukti = fotoBukti.base64; payload.mimeTypeBukti = fotoBukti.mimeType; }
+      }
+
+      const json = await panggil(payload);
+      if (json.success) {
+        let msg = '✅ Nota tersimpan!<br>No. Faktur: ' + esc(json.accurateNumber) + '<br>Total: ' + formatRp(json.totalNilai) + '<br><br>';
+        if (json.pembayaran) {
+          msg += 'Status bayar: ' + esc(json.pembayaran.status);
+          if (json.pembayaran.nominal) msg += ' (' + formatRp(json.pembayaran.nominal) + ')';
+          if (json.pembayaran.noPembayaran) msg += '<br>No. Pembayaran: ' + esc(json.pembayaran.noPembayaran);
+          if (json.pembayaran.error) msg += '<br>⚠️ ' + esc(json.pembayaran.error);
+          if (json.pembayaran.catatan) msg += '<br>ℹ️ ' + esc(json.pembayaran.catatan);
+        }
+        msg += '<br><br>Stok bahan packing di Accurate sudah nambah otomatis.';
+        tampilkanHasil(true, msg);
+        if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      } else {
+        tampilkanHasil(false, esc(json.error || 'Gagal simpan nota.'));
+      }
+    } catch (err) {
+      tampilkanHasil(false, 'Gagal terhubung ke server: ' + esc(err.message));
+    } finally {
+      btn.disabled = false; btn.textContent = 'Simpan Nota';
+    }
+  }
+
+  function tampilkanHasil(sukses, html) {
+    const el = document.getElementById('result');
+    el.className = 'result ' + (sukses ? 'success' : 'error');
+    el.innerHTML = html;
+  }
+</script>
+</body>
+</html>
