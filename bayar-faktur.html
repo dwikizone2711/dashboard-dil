@@ -42,9 +42,12 @@
   input[type=file] { padding: 8px; font-size: 13px; }
   button.submit-btn { width: 100%; margin-top: 18px; padding: 14px; background: #1a3a5c; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
   button.submit-btn:disabled { background: #a0a0a0; }
+  button.submit-btn.locked { background: #c0392b; }
   .result { display: none; margin-top: 16px; padding: 14px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
   .result.success { display: block; background: #e6f7ec; color: #1e7e34; }
   .result.error { display: block; background: #fdecea; color: #c0392b; }
+  .result.warning { display: block; background: #fff8e1; color: #8a6100; border: 1px solid #f0c14b; }
+  .reset-link { display: none; margin-top: 10px; font-size: 13px; color: #1a3a5c; text-decoration: underline; cursor: pointer; text-align: center; }
 </style>
 </head>
 <body>
@@ -91,6 +94,7 @@
       <input type="file" id="fotoBukti" accept="image/*" capture="environment">
 
       <button class="submit-btn" id="submitBtn" onclick="submitBayar()">Catat & Push ke Accurate (FIFO)</button>
+      <div class="reset-link" id="resetLink" onclick="resetTombolSetelahDicek()">Saya udah cek Accurate, aman → aktifkan tombol lagi</div>
     </div>
   </div>
 
@@ -212,6 +216,14 @@
     });
   }
 
+  function resetTombolSetelahDicek() {
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = false;
+    btn.classList.remove('locked');
+    btn.textContent = 'Catat & Push ke Accurate (FIFO)';
+    document.getElementById('resetLink').style.display = 'none';
+  }
+
   async function submitBayar() {
     if (!supplierTerpilih) return;
     const nominal = parseFloat(document.getElementById('nominal').value);
@@ -221,6 +233,10 @@
 
     const btn = document.getElementById('submitBtn');
     btn.disabled = true; btn.textContent = 'Mengirim...';
+
+    // Nandain kalau respons dari server sempat KETERIMA (walau gagal di-parse) —
+    // itu beda kasus sama koneksi yang putus SEBELUM sempat nyampe server sama sekali.
+    let responsSempatDiterima = false;
 
     try {
       const fotoBuktiFile = document.getElementById('fotoBukti').files[0];
@@ -243,7 +259,11 @@
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(payload)
       });
-      const json = await resp.json();
+
+      const teksMentah = await resp.text();
+      responsSempatDiterima = true;
+      const json = JSON.parse(teksMentah);
+
       if (json.success) {
         let msg = '✅ Pembayaran FIFO ke ' + json.namaSupplier + ' berhasil!<br>';
         msg += 'Nominal terpakai: ' + formatRp(json.nominalTerpakai) + '<br>';
@@ -254,19 +274,45 @@
         });
         tampilkanHasil(true, msg);
         if (tg) tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success');
+        btn.disabled = false; btn.textContent = 'Catat & Push ke Accurate (FIFO)';
       } else {
         tampilkanHasil(false, json.error || 'Gagal mencatat pembayaran.');
+        btn.disabled = false; btn.textContent = 'Catat & Push ke Accurate (FIFO)';
       }
     } catch (err) {
-      tampilkanHasil(false, 'Gagal terhubung ke server: ' + err.message);
-    } finally {
-      btn.disabled = false; btn.textContent = 'Catat & Push ke Accurate (FIFO)';
+      if (responsSempatDiterima) {
+        // Server SEMPAT balas, cuma bukan JSON valid (biasanya abis deploy ulang,
+        // atau proses di server kelamaan). Pembayarannya KEMUNGKINAN BESAR udah
+        // kepush ke Accurate — jangan biarin tombolnya ditekan lagi tanpa dicek dulu.
+        tampilkanHasilWarning(
+          '⚠️ Respons dari server nggak kebaca dengan benar (kemungkinan abis deploy ulang / proses lama).<br><br>' +
+          '<b>Pembayaran ini KEMUNGKINAN BESAR SUDAH kepush ke Accurate.</b><br>' +
+          'Cek dulu di Accurate → Purchase Payment, vendor <b>' + supplierTerpilih.namaSupplier + '</b>, tanggal ' + tanggal + ', nominal ' + formatRp(nominal) + '.<br><br>' +
+          'Kalau udah kepush, JANGAN kirim ulang — tutup mini app ini aja. Kalau ternyata belum kepush, klik link di bawah buat aktifin tombolnya lagi.'
+        );
+        btn.textContent = 'Cek Accurate dulu';
+        btn.classList.add('locked');
+        document.getElementById('resetLink').style.display = 'block';
+        // sengaja tetep disabled, nggak di-reset otomatis
+      } else if (err.name === 'AbortError') {
+        btn.disabled = false; btn.textContent = 'Catat & Push ke Accurate (FIFO)';
+      } else {
+        // Gagal sebelum sempat nyampe server (network putus dsb) — aman buat dicoba lagi
+        tampilkanHasil(false, 'Gagal terhubung ke server: ' + err.message);
+        btn.disabled = false; btn.textContent = 'Catat & Push ke Accurate (FIFO)';
+      }
     }
   }
 
   function tampilkanHasil(sukses, html) {
     const el = document.getElementById('result');
     el.className = 'result ' + (sukses ? 'success' : 'error');
+    el.innerHTML = html;
+  }
+
+  function tampilkanHasilWarning(html) {
+    const el = document.getElementById('result');
+    el.className = 'result warning';
     el.innerHTML = html;
   }
 </script>
