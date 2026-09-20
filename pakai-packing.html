@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Pemakaian Packing</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root { --bg:#0d0f17; --card:#1a1d2b; --line:#2a2e42; --input:#11131c; --text:#e6e8f0; --muted:#8b90a8; --err:#ef4444; --ok:#22c55e; --warn:#f59e0b; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:14px; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:18px; max-width:520px; margin:0 auto; }
+  .head { display:flex; gap:12px; align-items:center; padding-bottom:14px; border-bottom:1px solid var(--line); margin-bottom:14px; }
+  .ico { font-size:34px; line-height:1; }
+  h1 { margin:0; font-size:20px; }
+  .sub { margin:2px 0 0; color:var(--muted); font-size:13px; }
+  .note { padding:10px 12px; border-radius:10px; background:#141726; border:1px solid var(--line); color:var(--muted); font-size:14px; margin-bottom:14px; }
+  .note.warn { border-color:var(--warn); color:var(--warn); }
+  .note.err { border-color:var(--err); color:var(--err); white-space:pre-line; }
+  .note.ok { border-color:var(--ok); color:var(--ok); }
+  .field { margin-bottom:14px; }
+  .row { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+  .row label { font-size:15px; font-weight:600; }
+  .stok { font-size:13px; color:var(--muted); }
+  input { width:100%; padding:14px; font-size:18px; color:var(--text); background:var(--input); border:1px solid var(--line); border-radius:12px; outline:none; }
+  input:focus { border-color:#6366f1; }
+  input.bad { border-color:var(--err); }
+  .errtxt { color:var(--err); font-size:12px; margin-top:4px; min-height:0; }
+  button { width:100%; padding:16px; font-size:17px; font-weight:700; color:#fff; border:0; border-radius:14px; background:linear-gradient(135deg,#6366f1,#8b5cf6); cursor:pointer; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .hidden { display:none; }
+  .hint { color:var(--muted); font-size:12px; margin:0 0 12px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="head">
+    <div class="ico">📦</div>
+    <div>
+      <h1>Pemakaian Packing</h1>
+      <p class="sub">CV Dwi Karya Makmur Sejahtera</p>
+    </div>
+  </div>
+
+  <div id="status" class="note">Memuat stok dari Accurate...</div>
+
+  <div id="form" class="hidden">
+    <p class="hint">Isi jumlah yang DIPAKAI hari ini. Isi 0 kalau tidak ada yang dipakai. Tidak boleh melebihi stok.</p>
+    <div id="fields"></div>
+    <button id="btn" disabled>✅ Simpan Pemakaian</button>
+  </div>
+</div>
+
+<script>
+  // Alamat web app GAS DKMS (sama dengan yang dipakai bot absensi)
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
+
+  // Diisi otomatis oleh GAS saat halaman dibuka lewat tombol di bot (dibiarkan apa adanya kalau di-hosting di luar GAS)
+  const CHAT_ID_SERVER = '__CHAT_ID__';
+  const punyaServer = (typeof google !== 'undefined') && google.script && google.script.run;
+
+  const tg = window.Telegram && window.Telegram.WebApp;
+  if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
+  const qs = new URLSearchParams(location.search);
+  const chatId = (CHAT_ID_SERVER.indexOf('__') !== 0 ? CHAT_ID_SERVER : '') ||
+    (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) || qs.get('chatId') || '';
+
+  let items = [];
+  const elStatus = document.getElementById('status');
+  const elForm = document.getElementById('form');
+  const elFields = document.getElementById('fields');
+  const elBtn = document.getElementById('btn');
+
+  function fmt(n) { return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 3 }).format(n); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function setStatus(teks, kelas) { elStatus.className = 'note' + (kelas ? ' ' + kelas : ''); elStatus.textContent = teks; elStatus.classList.remove('hidden'); }
+
+  function parseAngka(v) {
+    const t = String(v).trim().replace(',', '.');
+    if (t === '') return null;
+    const n = Number(t);
+    return (isFinite(n) && n >= 0) ? n : NaN;
+  }
+
+  function validasi() {
+    let semuaOk = true;
+    items.forEach(function (it) {
+      const inp = document.getElementById('in_' + it.kunci);
+      const err = document.getElementById('er_' + it.kunci);
+      const n = parseAngka(inp.value);
+      let pesan = '';
+      if (n === null) { semuaOk = false; }
+      else if (isNaN(n)) { pesan = 'Angka tidak valid'; semuaOk = false; }
+      else if (n > it.stok + 1e-9) { pesan = 'Melebihi stok (' + fmt(it.stok) + ' ' + it.satuan + ')'; semuaOk = false; }
+      inp.classList.toggle('bad', !!pesan);
+      err.textContent = pesan;
+    });
+    elBtn.disabled = !semuaOk;
+  }
+
+  function gambarForm() {
+    elFields.innerHTML = '';
+    items.forEach(function (it) {
+      const div = document.createElement('div');
+      div.className = 'field';
+      div.innerHTML =
+        '<div class="row"><label for="in_' + esc(it.kunci) + '">' + esc(it.label) + ' (' + esc(it.satuan) + ')</label>' +
+        '<span class="stok">Stok: ' + fmt(it.stok) + ' ' + esc(it.satuan) + '</span></div>' +
+        '<input id="in_' + esc(it.kunci) + '" type="text" inputmode="decimal" autocomplete="off" placeholder="0">' +
+        '<div class="errtxt" id="er_' + esc(it.kunci) + '"></div>';
+      elFields.appendChild(div);
+      div.querySelector('input').addEventListener('input', validasi);
+    });
+    elForm.classList.remove('hidden');
+    validasi();
+  }
+
+  async function panggil(params) {
+    if (punyaServer) {
+      return new Promise(function (resolve, reject) {
+        const run = google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(function (e) { reject(new Error((e && e.message) ? e.message : String(e))); });
+        if (params.action === 'info_packing') run.apiInfoPacking(params.chatId);
+        else run.apiSimpanPemakaianPacking(params.chatId, { lakban: params.lakban, plastik: params.plastik, bubble: params.bubble, thermal: params.thermal });
+      });
+    }
+    const url = GAS_URL + '?' + Object.keys(params).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); }).join('&');
+    const resp = await fetch(url);
+    const teks = await resp.text();
+    try { return JSON.parse(teks); }
+    catch (e) { throw new Error('Balasan server tidak dikenali. Coba lagi.'); }
+  }
+
+  async function muat() {
+    if (!chatId) { setStatus('Buka mini app ini lewat tombol di bot Telegram.', 'err'); return; }
+    try {
+      const info = await panggil({ action: 'info_packing', chatId: chatId });
+      if (!info.success) { setStatus(info.error || 'Gagal memuat data.', 'err'); return; }
+      if (info.sudahDiisiOleh) {
+        setStatus('Laporan packing hari ini sudah diisi oleh ' + info.sudahDiisiOleh + '. Kamu tidak perlu mengisi lagi. Silakan lanjut absen pulang.', 'ok');
+        return;
+      }
+      items = info.items || [];
+      setStatus('Halo ' + info.nama + '! ' + (info.wajib ? 'Giliran kamu mengisi pemakaian packing hari ini.' : 'Laporan hari ini belum diisi (' + info.alasan + '). Kamu tetap boleh mengisi.'), info.wajib ? 'warn' : '');
+      gambarForm();
+    } catch (e) {
+      setStatus('Gagal memuat: ' + e.message, 'err');
+    }
+  }
+
+  elBtn.addEventListener('click', async function () {
+    elBtn.disabled = true;
+    elBtn.textContent = 'Menyimpan... (jangan ditutup)';
+    const params = { action: 'simpan_pakai_packing', chatId: chatId };
+    items.forEach(function (it) { params[it.kunci] = document.getElementById('in_' + it.kunci).value.trim().replace(',', '.'); });
+    try {
+      const hasil = await panggil(params);
+      if (!hasil.success) {
+        setStatus(hasil.error || 'Gagal menyimpan.', 'err');
+        elBtn.textContent = '✅ Simpan Pemakaian';
+        validasi();
+        return;
+      }
+      elForm.classList.add('hidden');
+      let pesan = (hasil.pesan || 'Tersimpan.');
+      if (hasil.total > 0) pesan += ' Nilai pemakaian: Rp ' + fmt(hasil.total) + '.';
+      pesan += ' Sekarang tutup jendela ini, kembali ke bot, dan kirim /absen_pulang lagi.';
+      if (hasil.tertunda) setStatus((hasil.peringatan || 'Tersimpan, pengiriman ke Accurate menyusul.') + ' Kamu tetap bisa absen pulang: tutup jendela ini lalu kirim /absen_pulang lagi.', 'warn');
+      else setStatus('✅ ' + pesan, 'ok');
+      if (tg) setTimeout(function () { try { tg.close(); } catch (e) {} }, 3500);
+    } catch (e) {
+      setStatus('Gagal menyimpan: ' + e.message + '. Cek dulu di bot, lalu coba lagi kalau belum tersimpan.', 'err');
+      elBtn.textContent = '✅ Simpan Pemakaian';
+      validasi();
+    }
+  });
+
+  muat();
+</script>
+</body>
+</html>
