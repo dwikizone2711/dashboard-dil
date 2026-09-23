@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Stok Bahan Packing</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root { --bg:#0d0f17; --card:#1a1d2b; --line:#2a2e42; --text:#e6e8f0; --muted:#8b90a8; --err:#ef4444; --ok:#22c55e; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:14px; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:18px; max-width:520px; margin:0 auto; }
+  .head { display:flex; gap:12px; align-items:center; padding-bottom:14px; border-bottom:1px solid var(--line); margin-bottom:14px; }
+  .ico { font-size:34px; line-height:1; }
+  h1 { margin:0; font-size:20px; }
+  .sub { margin:2px 0 0; color:var(--muted); font-size:13px; }
+  .note { padding:10px 12px; border-radius:10px; background:#141726; border:1px solid var(--line); color:var(--muted); font-size:14px; margin-bottom:14px; }
+  .note.err { border-color:var(--err); color:var(--err); }
+  .item { display:flex; justify-content:space-between; align-items:center; padding:14px; border:1px solid var(--line); border-radius:12px; margin-bottom:10px; background:#11131c; }
+  .item .nm { font-weight:700; font-size:15px; }
+  .item .kode { color:var(--muted); font-size:11.5px; margin-top:2px; }
+  .item .stok { font-size:19px; font-weight:700; text-align:right; }
+  .item .sat { color:var(--muted); font-size:12px; text-align:right; }
+  .refresh { width:100%; padding:13px; margin-top:4px; background:#1a1d2b; border:1px solid var(--line); color:var(--text); border-radius:12px; font-size:14px; cursor:pointer; }
+  .waktu { text-align:center; color:var(--muted); font-size:11.5px; margin-top:10px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="head">
+    <div class="ico">📊</div>
+    <div>
+      <h1>Stok Bahan Packing</h1>
+      <p class="sub">CV Dwi Karya Makmur Sejahtera</p>
+    </div>
+  </div>
+
+  <div id="status" class="note">Memuat stok dari Accurate...</div>
+  <div id="items"></div>
+  <button class="refresh" id="btnRefresh">🔄 Refresh</button>
+  <div class="waktu" id="waktu"></div>
+</div>
+
+<script>
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
+
+  const tg = window.Telegram && window.Telegram.WebApp;
+  if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
+  const qs = new URLSearchParams(location.search);
+  const chatId = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) || qs.get('chatId') || '';
+
+  const elStatus = document.getElementById('status');
+  const elItems = document.getElementById('items');
+  const elWaktu = document.getElementById('waktu');
+  const elBtn = document.getElementById('btnRefresh');
+
+  function fmt(n) { return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 3 }).format(n); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function setStatus(teks, kelas) {
+    if (!teks) { elStatus.classList.add('hidden'); elStatus.textContent = ''; return; }
+    elStatus.className = 'note' + (kelas ? ' ' + kelas : '');
+    elStatus.textContent = teks;
+  }
+
+  async function muat() {
+    if (!chatId) { setStatus('Buka mini app ini lewat tombol di bot Telegram.', 'err'); return; }
+    elBtn.disabled = true; elBtn.textContent = 'Memuat...';
+    setStatus('Memuat stok dari Accurate...');
+    elItems.innerHTML = '';
+    try {
+      const resp = await fetch(GAS_URL + '?action=info_packing&chatId=' + encodeURIComponent(chatId));
+      const teks = await resp.text();
+      let info;
+      try { info = JSON.parse(teks); }
+      catch (e) { throw new Error('Balasan server tidak dikenali. Coba lagi.'); }
+      if (!info.success) { setStatus(info.error || 'Gagal memuat data.', 'err'); return; }
+
+      setStatus('');
+      (info.items || []).forEach(function (it) {
+        const d = document.createElement('div');
+        d.className = 'item';
+        d.innerHTML =
+          '<div><div class="nm">' + esc(it.label) + '</div><div class="kode">' + esc(it.itemNo || '') + '</div></div>' +
+          '<div><div class="stok">' + fmt(it.stok) + '</div><div class="sat">' + esc(it.satuan) + '</div></div>';
+        elItems.appendChild(d);
+      });
+      elWaktu.textContent = 'Diperbarui ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      setStatus('Gagal memuat: ' + e.message, 'err');
+    } finally {
+      elBtn.disabled = false; elBtn.textContent = '🔄 Refresh';
+    }
+  }
+
+  elBtn.addEventListener('click', muat);
+  muat();
+</script>
+</body>
+</html>
