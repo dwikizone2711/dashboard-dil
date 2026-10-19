@@ -35,7 +35,7 @@
   .desc {
     font-size: 13px; color: var(--muted); line-height: 1.6;
     background: #f8fafc; border: 1px solid var(--border);
-    border-radius: 8px; padding: 10px 12px; margin-bottom: 4px;
+    border-radius: 8px; padding: 10px 12px;
   }
   .desc b { color: var(--text); }
   label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
@@ -67,7 +67,7 @@
   <h1>🏦 Dana DIL</h1>
 
   <div class="tabs">
-    <button class="tab active" data-mode="pinjam">Pinjam Dana</button>
+    <button class="tab" data-mode="pinjam">Pinjam Dana</button>
     <button class="tab" data-mode="kembali">Kembalikan Dana</button>
   </div>
 
@@ -89,7 +89,6 @@
 </div>
 
 <script>
-  // ==== GANTI INI ====
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
 
   const MODE = {
@@ -241,9 +240,10 @@
 
   el.btn.addEventListener('click', submit);
 
-  // Init
+  // Init: buka tab sesuai ?mode= dari tombol Telegram (pinjam / kembali)
+  const urlMode = new URLSearchParams(window.location.search).get('mode');
   el.tanggal.value = todayJakarta();
-  setMode('pinjam');
+  setMode(urlMode === 'kembali' ? 'kembali' : 'pinjam');
 </script>
 </body>
 </html>
