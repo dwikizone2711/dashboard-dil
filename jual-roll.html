@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Jual Roll Kawat</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --text: var(--tg-theme-text-color, #1a1a1a);
+    --hint: var(--tg-theme-hint-color, #7a7a7a);
+    --card: var(--tg-theme-secondary-bg-color, #f2f4f7);
+    --btn: var(--tg-theme-button-color, #1a3a5c);
+    --btn-text: var(--tg-theme-button-text-color, #ffffff);
+    --ok: #1e8e3e;
+    --err: #d93025;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+  }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  .card { background: var(--card); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  .stok { display: flex; justify-content: space-between; align-items: center; }
+  .stok b { font-size: 22px; }
+  label { display: block; font-size: 13px; color: var(--hint); margin: 12px 0 4px; }
+  input, textarea {
+    width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #c9ced6;
+    background: var(--bg); color: var(--text); font-size: 16px;
+  }
+  textarea { resize: vertical; min-height: 60px; }
+  .total { font-size: 14px; color: var(--hint); margin-top: 8px; }
+  .total b { color: var(--text); }
+  button {
+    width: 100%; padding: 14px; border: 0; border-radius: 12px; margin-top: 16px;
+    background: var(--btn); color: var(--btn-text); font-size: 16px; font-weight: 600;
+  }
+  button:disabled { opacity: .5; }
+  .link { background: none; color: var(--btn); padding: 4px; width: auto; margin: 0; font-size: 14px; }
+  .msg { margin-top: 14px; padding: 12px; border-radius: 10px; font-size: 14px; white-space: pre-line; }
+  .msg.ok { background: #e6f4ea; color: var(--ok); }
+  .msg.err { background: #fce8e6; color: var(--err); }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<h1>🪙 Jual Roll Kawat</h1>
+<div class="card stok">
+  <div>
+    <div style="font-size:13px;color:var(--hint)">Sisa stok roll DIL</div>
+    <b id="sisa">...</b> <span id="sisaSatuan" style="color:var(--hint)">roll</span>
+  </div>
+  <button class="link" id="btnRefresh" type="button">↻ Refresh</button>
+</div>
+
+<div class="card">
+  <label for="tanggal">Tanggal</label>
+  <input type="date" id="tanggal">
+
+  <label for="jumlah">Jumlah roll</label>
+  <input type="number" id="jumlah" inputmode="numeric" min="1" step="1" placeholder="Contoh: 5">
+
+  <label for="harga">Harga per roll (Rp)</label>
+  <input type="number" id="harga" inputmode="numeric" min="1" step="1" value="710000">
+
+  <div class="total">
+    Berat: <b id="beratTxt">0 kg</b> &nbsp;•&nbsp; Total: <b id="totalTxt">Rp 0</b>
+  </div>
+
+  <label for="catatan">Catatan (opsional)</label>
+  <textarea id="catatan" placeholder="Misal: kirim kawat untuk produksi DKMS"></textarea>
+
+  <button id="btnKirim" type="button">Catat Penjualan Roll</button>
+</div>
+
+<div id="hasil" class="msg hidden"></div>
+
+<script>
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycby2wyVacT1kFqYt5481dypHMCp5T_Eg_KertLLWXNE0yu3YqKg4RiDNiqKWPlwGvhCxqw/exec';
+  const KG_PER_ROLL = 49.5;
+
+  const tg = window.Telegram && window.Telegram.WebApp;
+  if (tg) { tg.ready(); tg.expand(); }
+
+  const params = new URLSearchParams(location.search);
+  const chatId = params.get('chatId') || (tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : '');
+
+  const $ = id => document.getElementById(id);
+  const rp = n => 'Rp ' + Math.round(n).toLocaleString('id-ID');
+
+  function newIdKey() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+  }
+  let idKey = newIdKey();
+
+  function todayJakarta() {
+    const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+    const p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+  $('tanggal').value = todayJakarta();
+
+  function hitung() {
+    const j = parseInt($('jumlah').value, 10) || 0;
+    const h = parseFloat($('harga').value) || 0;
+    $('beratTxt').textContent = (j * KG_PER_ROLL).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + ' kg';
+    $('totalTxt').textContent = rp(j * h);
+  }
+  $('jumlah').addEventListener('input', hitung);
+  $('harga').addEventListener('input', hitung);
+
+  function tampil(teks, ok) {
+    const el = $('hasil');
+    el.textContent = teks;
+    el.className = 'msg ' + (ok ? 'ok' : 'err');
+  }
+
+  async function panggil(action, data) {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: action, data: data })
+    });
+    return await res.json();
+  }
+
+  async function muatStok() {
+    $('sisa').textContent = '...';
+    try {
+      const r = await panggil('cek_stok_roll_dil', { chatId: chatId });
+      if (r && r.success) {
+        $('sisa').textContent = Number(r.sisaRoll).toLocaleString('id-ID', { maximumFractionDigits: 1 });
+      } else {
+        $('sisa').textContent = '?';
+      }
+    } catch (e) {
+      $('sisa').textContent = '?';
+    }
+  }
+  $('btnRefresh').addEventListener('click', muatStok);
+
+  $('btnKirim').addEventListener('click', async () => {
+    const jumlahRoll = parseInt($('jumlah').value, 10);
+    const hargaPerRoll = parseFloat($('harga').value);
+    const tanggal = $('tanggal').value;
+    const catatan = $('catatan').value.trim();
+
+    if (!tanggal) return tampil('Tanggal wajib diisi.', false);
+    if (!jumlahRoll || jumlahRoll < 1) return tampil('Jumlah roll minimal 1.', false);
+    if (!hargaPerRoll || hargaPerRoll <= 0) return tampil('Harga per roll tidak valid.', false);
+
+    const ringkas = jumlahRoll + ' roll × ' + rp(hargaPerRoll) + ' = ' + rp(jumlahRoll * hargaPerRoll);
+    if (!confirm('Catat penjualan roll ke DKMS?\n\n' + ringkas)) return;
+
+    const btn = $('btnKirim');
+    btn.disabled = true;
+    btn.textContent = 'Memproses...';
+    $('hasil').className = 'msg hidden';
+
+    try {
+      const r = await panggil('jual_roll_dil', {
+        chatId: chatId, idKey: idKey, tanggal: tanggal,
+        jumlahRoll: jumlahRoll, hargaPerRoll: hargaPerRoll, catatan: catatan
+      });
+      if (r && r.success) {
+        tampil(
+          '✅ Berhasil\n' +
+          'No. Faktur DIL: ' + r.noFakturDil + '\n' +
+          'No. Faktur DKMS: ' + r.noFakturDkms + '\n' +
+          ringkas + '\n' +
+          'Sisa stok roll: ' + r.sisaRollSesudah,
+          true
+        );
+        idKey = newIdKey();
+        $('jumlah').value = '';
+        $('catatan').value = '';
+        hitung();
+        muatStok();
+        if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      } else {
+        tampil('❌ ' + ((r && r.error) || 'Gagal memproses.'), false);
+        if (r && r.noFakturDil && !r.duplikat) idKey = newIdKey();
+        if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+      }
+    } catch (e) {
+      tampil('❌ Gagal terhubung ke server: ' + e.message + '\nCek Rekap/Log Jual Roll dulu sebelum mengulang.', false);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Catat Penjualan Roll';
+    }
+  });
+
+  hitung();
+  muatStok();
+</script>
+</body>
+</html>
