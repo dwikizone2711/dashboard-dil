@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dana DIL</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: #f4f6f8; --card: #fff; --text: #1d2433; --muted: #6b7280;
+    --primary: #2563eb; --border: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  .wrap { max-width: 480px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 4px 0 12px; }
+  .tabs {
+    display: flex; background: #e5e7eb; border-radius: 10px;
+    padding: 4px; margin-bottom: 16px;
+  }
+  .tab {
+    flex: 1; border: 0; background: transparent; padding: 10px;
+    border-radius: 8px; font-size: 14px; font-weight: 600;
+    color: var(--muted); cursor: pointer;
+  }
+  .tab.active { background: #fff; color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+  .card {
+    background: var(--card); border-radius: 12px; padding: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .desc {
+    font-size: 13px; color: var(--muted); line-height: 1.6;
+    background: #f8fafc; border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px; margin-bottom: 4px;
+  }
+  .desc b { color: var(--text); }
+  label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
+  input {
+    width: 100%; padding: 12px; font-size: 16px;
+    border: 1px solid var(--border); border-radius: 8px; background: #fff;
+  }
+  .chips { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .chip {
+    border: 1px solid var(--border); background: #fff; border-radius: 999px;
+    padding: 6px 12px; font-size: 13px; cursor: pointer;
+  }
+  .submit {
+    width: 100%; margin-top: 18px; padding: 14px; border: 0; border-radius: 10px;
+    font-size: 16px; font-weight: 700; color: #fff; background: var(--primary); cursor: pointer;
+  }
+  .submit:disabled { opacity: .6; cursor: not-allowed; }
+  .result {
+    margin-top: 16px; padding: 14px; border-radius: 10px;
+    font-size: 14px; line-height: 1.6; white-space: pre-wrap; display: none;
+  }
+  .result.ok   { display: block; background: #f0fdf4; border: 1px solid #bbf7d0; color: #14532d; }
+  .result.warn { display: block; background: #fffbeb; border: 1px solid #fde68a; color: #78350f; }
+  .result.err  { display: block; background: #fef2f2; border: 1px solid #fecaca; color: #7f1d1d; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🏦 Dana DIL</h1>
+
+  <div class="tabs">
+    <button class="tab active" data-mode="pinjam">Pinjam Dana</button>
+    <button class="tab" data-mode="kembali">Kembalikan Dana</button>
+  </div>
+
+  <div class="card">
+    <div class="desc" id="desc"></div>
+
+    <label for="tanggal">Tanggal</label>
+    <input type="date" id="tanggal">
+    <div class="chips">
+      <button type="button" class="chip" id="chipHariIni">Hari ini</button>
+    </div>
+
+    <label for="nominal">Nominal (Rp)</label>
+    <input type="text" id="nominal" inputmode="numeric" placeholder="5.000.000" autocomplete="off">
+
+    <button class="submit" id="btnSubmit">Catat</button>
+    <div class="result" id="result"></div>
+  </div>
+</div>
+
+<script>
+  // ==== GANTI INI ====
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbxCmYiv4A6WsmeLK8PnFZ-_MjRDAgtAUTEWjkMO2NTtdyFr_fm-Sxox1LCzgHnMtkor/exec';
+
+  const MODE = {
+    pinjam: {
+      action: 'pinjam_dana_dil_app',
+      btnLabel: 'Catat Pinjam Dana',
+      title: 'Pinjam Dana DIL',
+      desc:
+        '<b>Jurnal otomatis:</b><br>' +
+        '• DKMS: Debit BCA DKMS, Kredit Akun Penampung Dana CV DIL<br>' +
+        '• DIL: Debit Akun Penampung Dana DKMS, Kredit BCA CV DIL'
+    },
+    kembali: {
+      action: 'kembalikan_dana_dil_app',
+      btnLabel: 'Catat Kembalikan Dana',
+      title: 'Kembalikan Dana DIL',
+      desc:
+        '<b>Jurnal otomatis:</b><br>' +
+        '• DKMS: Debit Akun Penampung Dana CV DIL, Kredit BCA DKMS<br>' +
+        '• DIL: Debit BCA CV DIL, Kredit Akun Penampung Dana DKMS'
+    }
+  };
+
+  let currentMode = 'pinjam';
+
+  const el = {
+    tabs: document.querySelectorAll('.tab'),
+    desc: document.getElementById('desc'),
+    tanggal: document.getElementById('tanggal'),
+    chipHariIni: document.getElementById('chipHariIni'),
+    nominal: document.getElementById('nominal'),
+    btn: document.getElementById('btnSubmit'),
+    result: document.getElementById('result')
+  };
+
+  // Tanggal hari ini menurut zona waktu Jakarta, format yyyy-mm-dd
+  function todayJakarta() {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date());
+  }
+
+  function getDicatatOleh() {
+    try {
+      const u = window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe
+        && Telegram.WebApp.initDataUnsafe.user;
+      if (u && u.first_name) return u.first_name;
+    } catch (e) {}
+    return 'Mini App';
+  }
+
+  function formatRupiah(n) {
+    return 'Rp ' + Number(n).toLocaleString('id-ID');
+  }
+
+  function setMode(mode) {
+    currentMode = mode;
+    el.tabs.forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+    el.desc.innerHTML = MODE[mode].desc;
+    el.btn.textContent = MODE[mode].btnLabel;
+    hideResult();
+  }
+
+  function showResult(type, text) {
+    el.result.className = 'result ' + type;
+    el.result.textContent = text;
+  }
+
+  function hideResult() {
+    el.result.className = 'result';
+    el.result.textContent = '';
+  }
+
+  // Format nominal otomatis dengan titik ribuan
+  el.nominal.addEventListener('input', () => {
+    const digits = el.nominal.value.replace(/\D/g, '');
+    el.nominal.value = digits ? Number(digits).toLocaleString('id-ID') : '';
+  });
+
+  el.chipHariIni.addEventListener('click', () => {
+    el.tanggal.value = todayJakarta();
+  });
+
+  el.tabs.forEach(t => t.addEventListener('click', () => setMode(t.dataset.mode)));
+
+  async function submit() {
+    const tanggal = el.tanggal.value;
+    const nominal = Number(el.nominal.value.replace(/\D/g, ''));
+
+    if (!tanggal) return showResult('err', 'Tanggal wajib diisi.');
+    if (!nominal || nominal <= 0) return showResult('err', 'Nominal nggak valid.');
+
+    const label = MODE[currentMode].title;
+    const ok = confirm(
+      label + '\n' +
+      'Tanggal: ' + tanggal + '\n' +
+      'Nominal: ' + formatRupiah(nominal) + '\n\n' +
+      'Lanjut catat?'
+    );
+    if (!ok) return;
+
+    el.btn.disabled = true;
+    el.btn.textContent = 'Mengirim...';
+    hideResult();
+
+    try {
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        // text/plain menghindari preflight CORS, sama seperti mini app lain
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: MODE[currentMode].action,
+          tanggal: tanggal,
+          nominal: nominal,
+          dicatatOleh: getDicatatOleh()
+        })
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        showResult('err', '❌ Gagal: ' + (data.error || 'error tidak diketahui'));
+      } else if (data.dilOk) {
+        showResult('ok',
+          '✅ ' + label + ' dicatat!\n\n' +
+          '💰 Nominal: ' + formatRupiah(data.nominal) + '\n' +
+          '📅 Tanggal: ' + data.transDate + '\n\n' +
+          '📗 DKMS: No ' + data.nomorDkms + '\n' +
+          '📕 DIL: No ' + data.nomorDil
+        );
+        el.nominal.value = '';
+      } else {
+        showResult('warn',
+          '⚠️ Sisi DKMS sudah tercatat (No ' + data.nomorDkms + ').\n\n' +
+          '❌ Sisi DIL GAGAL otomatis: ' + data.dilError + '\n\n' +
+          'Tolong catat manual di bot DIL:\n' + data.manualDil +
+          '\nNominal ' + formatRupiah(data.nominal) + ', tanggal ' + data.transDate + '.'
+        );
+      }
+    } catch (err) {
+      showResult('err',
+        '❌ Koneksi ke server gagal: ' + err.message + '\n\n' +
+        'Cek dulu di Accurate sebelum coba lagi, takutnya sudah ke-catat.'
+      );
+    } finally {
+      el.btn.disabled = false;
+      el.btn.textContent = MODE[currentMode].btnLabel;
+    }
+  }
+
+  el.btn.addEventListener('click', submit);
+
+  // Init
+  el.tanggal.value = todayJakarta();
+  setMode('pinjam');
+</script>
+</body>
+</html>
